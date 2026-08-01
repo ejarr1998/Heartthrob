@@ -137,7 +137,13 @@ input[type=text]::placeholder{color:#6E5CA8;font-weight:600}
 
 /* lobby players */
 .lobby-grid{display:flex;flex-wrap:wrap;gap:22px;justify-content:center;max-width:900px;margin:10px 0 26px}
-.lobby-player{display:flex;flex-direction:column;align-items:center;gap:10px;animation:popIn .45s cubic-bezier(.2,1.6,.4,1) both}
+.lobby-player{position:relative;display:flex;flex-direction:column;align-items:center;gap:10px;animation:popIn .45s cubic-bezier(.2,1.6,.4,1) both}
+.lobby-player .kick-btn{position:absolute;top:-6px;right:-6px;width:28px;height:28px;border-radius:50%;
+  background:var(--ink3);border:2px solid var(--line);color:var(--muted);font-weight:900;font-size:13px;
+  cursor:pointer;opacity:0;transition:opacity .15s;font-family:inherit;line-height:1}
+.lobby-player:hover .kick-btn{opacity:1}
+.lobby-player .kick-btn:hover{border-color:var(--rose);color:var(--rose)}
+@media (hover:none){.lobby-player .kick-btn{opacity:.7}}
 /* generic avatar — every .pav is a clipped circle even without a scoped size */
 .pav{width:48px;height:48px;border-radius:50%;overflow:hidden;border:3px solid var(--rose);flex:none;background:var(--ink3)}
 .pav img{width:100%;height:100%;object-fit:cover;display:block}
@@ -1421,8 +1427,14 @@ const TV = (() => {
     if (window.QRCode) new QRCode($('#lobbyQR'), { text: location.origin + location.pathname, width: 150, height: 150, correctLevel: QRCode.CorrectLevel.M });
     const g = s.querySelector('#lobbyGrid');
     if (!ps.length) g.innerHTML = '<div class="empty-slots">Waiting for the first brave soul<span class="dots"></span></div>';
-    ps.forEach(([pid, p]) => {
-      const d = el('div', 'lobby-player', `${pav(p.avatar)}<span>${esc(p.name)}</span>`);
+    ps.forEach(([kpid, p]) => {
+      const d = el('div', 'lobby-player', `${pav(p.avatar)}<span>${esc(p.name)}</span><button class="kick-btn" title="Kick">✕</button>`);
+      d.querySelector('.kick-btn').onclick = async e => {
+        e.stopPropagation();
+        if (!confirm(`Kick ${p.name} from the lobby?`)) return;
+        await db.ref(`rooms/${code}/players/${kpid}`).remove();
+        toast(`${p.name} kicked 👢`);
+      };
       g.appendChild(d);
     });
     const btn = s.querySelector('#startBtn');
