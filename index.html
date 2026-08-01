@@ -2137,6 +2137,18 @@ const Player = (() => {
     const c = $('#joinCode').value.trim().toUpperCase();
     const name = $('#joinName').value.trim();
     if (c.length !== 4) return err.textContent = 'Enter the 4-letter room code from the TV.';
+    // this device already has a player in THIS room → reconnect as them, never duplicate
+    const saved = (() => { try { return JSON.parse(localStorage.getItem('ht_player') || 'null'); } catch (e) { return null; } })();
+    if (saved && saved.code === c) {
+      const mine = await db.ref(`rooms/${c}/players/${saved.pid}`).once('value');
+      if (mine.exists()) {
+        toast(`You're already in as ${mine.val().name} — reconnecting.`);
+        code = c; pid = saved.pid;
+        enter();
+        return;
+      }
+      localStorage.removeItem('ht_player');   // stale session, allow a clean join
+    }
     if (!name) return err.textContent = 'What should we call you?';
     if (!avatarData) return err.textContent = 'Snap a selfie first — it shows up on the TV!';
     const snap = await db.ref('rooms/' + c).once('value');
@@ -2144,6 +2156,9 @@ const Player = (() => {
     const rm = snap.val();
     if (rm.state !== 'lobby') return err.textContent = 'That game already started — wait for the next one!';
     if (Object.keys(rm.players || {}).length >= 6) return err.textContent = 'Room is full (6 max).';
+    // no two players with the same name
+    const taken = Object.values(rm.players || {}).some(p => (p.name || '').trim().toLowerCase() === name.toLowerCase());
+    if (taken) return err.textContent = `"${name}" is already in this room — pick a different name.`;
     code = c;
     pid = db.ref(`rooms/${c}/players`).push().key;
     await db.ref(`rooms/${c}/players/${pid}`).set({ name, avatar: avatarData, order: Date.now() });
