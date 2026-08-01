@@ -138,6 +138,9 @@ input[type=text]::placeholder{color:#6E5CA8;font-weight:600}
 /* lobby players */
 .lobby-grid{display:flex;flex-wrap:wrap;gap:22px;justify-content:center;max-width:900px;margin:10px 0 26px}
 .lobby-player{display:flex;flex-direction:column;align-items:center;gap:10px;animation:popIn .45s cubic-bezier(.2,1.6,.4,1) both}
+/* generic avatar — every .pav is a clipped circle even without a scoped size */
+.pav{width:48px;height:48px;border-radius:50%;overflow:hidden;border:3px solid var(--rose);flex:none;background:var(--ink3)}
+.pav img{width:100%;height:100%;object-fit:cover;display:block}
 .lobby-player .pav{width:96px;height:96px;border-radius:50%;overflow:hidden;border:4px solid var(--rose);box-shadow:var(--shadow)}
 .lobby-player .pav img{width:100%;height:100%;object-fit:cover}
 .lobby-player span{font-weight:800;font-size:17px}
@@ -386,25 +389,26 @@ input[type=text]::placeholder{color:#6E5CA8;font-weight:600}
 .awards-scroll{align-self:stretch;flex:1;min-height:0;width:100%;overflow-y:auto;display:flex}
 .awards-inner{margin:auto;display:flex;flex-direction:column;align-items:center;width:100%;padding:12px 0}
 .award-grid{display:flex;flex-wrap:wrap;gap:22px;justify-content:center;max-width:1150px}
-.award-card{width:230px;padding:18px 16px;text-align:center;animation:popIn .5s cubic-bezier(.2,1.5,.4,1) both}
+.award-card{width:230px;padding:20px 16px 18px;text-align:center;animation:popIn .5s cubic-bezier(.2,1.5,.4,1) both;
+  display:flex;flex-direction:column;align-items:center}
 .award-card:nth-child(2){animation-delay:.45s}.award-card:nth-child(3){animation-delay:.9s}.award-card:nth-child(4){animation-delay:1.35s}
-.award-card .award-emoji{font-size:40px;margin-bottom:6px}
-.award-card h3{font-family:'Bungee';font-size:17px;margin:10px 0 6px;color:var(--gold)}
+.award-card .award-emoji{font-size:40px;margin-bottom:10px}
+.award-card h3{font-family:'Bungee';font-size:17px;margin:12px 0 6px;color:var(--gold)}
 .award-card p{color:var(--muted);font-weight:700;font-size:13px;line-height:1.45}
-.award-card .award-photo{width:150px;height:150px;border-radius:16px;overflow:hidden;border:3px solid var(--rose);margin:0 auto;box-shadow:var(--shadow)}
-.award-card .award-photo img{width:100%;height:100%;object-fit:cover}
-.award-card .award-people{display:flex;justify-content:center;gap:8px}
-.award-card .award-people .pav{width:76px;height:76px}
-.award-name{font-weight:800;color:var(--cream);font-size:15px;margin-top:8px}
+.award-card .award-photo{width:140px;height:140px;border-radius:16px;overflow:hidden;border:3px solid var(--rose);box-shadow:var(--shadow);flex:none}
+.award-card .award-photo img{width:100%;height:100%;object-fit:cover;display:block}
+.award-card .award-people{display:flex;justify-content:center;gap:10px}
+.award-card .award-people .pav{width:82px;height:82px;border-width:4px;box-shadow:var(--shadow)}
+.award-name{font-weight:800;color:var(--cream);font-size:15px;margin-top:10px}
 
 /* compatibility matrix */
 .compat-wrap{margin-top:26px;text-align:center;animation:popIn .5s 1.7s cubic-bezier(.2,1.5,.4,1) both}
 .compat-wrap h3{font-family:'Bungee';font-size:18px;margin-bottom:12px}
 .compat-table{border-collapse:separate;border-spacing:5px;margin:0 auto}
-.compat-table .pav{width:44px;height:44px;margin:0 auto}
+.compat-table .pav{width:44px;height:44px;margin:0 auto;border-width:3px}
+.compat-table td.hd{background:transparent;border:none;vertical-align:middle}
 .compat-table td{background:var(--ink2);border:1px solid var(--line);border-radius:10px;min-width:56px;height:48px;
   font-weight:800;font-size:15px;color:var(--cream);text-align:center;padding:0 8px}
-.compat-table td.hd{background:transparent;border:none}
 .compat-table td.self{background:transparent;border:1px dashed var(--line);color:#584a86}
 .compat-table td.best{border-color:var(--gold);color:var(--gold);box-shadow:0 0 14px rgba(255,194,75,.3)}
 .compat-table td.worst{color:#584a86}
