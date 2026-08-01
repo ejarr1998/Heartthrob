@@ -464,6 +464,18 @@ input[type=text]::placeholder{color:#6E5CA8;font-weight:600}
   box-shadow:0 0 0 3px rgba(255,194,75,.35),0 0 40px rgba(255,194,75,.45),var(--shadow)}
 .sd-votecard.loser{filter:grayscale(1) brightness(.45);transform:scale(.93)}
 .sd-voters{display:flex;gap:8px;justify-content:center;margin-top:16px;flex-wrap:wrap}
+.sd-col{display:flex;flex-direction:column;align-items:center;gap:12px;min-width:0}
+.taunt{max-width:min(56vh,40vw);background:var(--ink2);border:2px solid var(--line);border-radius:16px;
+  padding:9px 16px;font-weight:800;font-size:clamp(14px,1.5vw,19px);color:var(--cream);text-align:center;position:relative;
+  animation:popIn .4s cubic-bezier(.2,1.6,.4,1) both}
+.taunt::before{content:"";position:absolute;top:-8px;left:50%;transform:translateX(-50%) rotate(45deg);
+  width:14px;height:14px;background:var(--ink2);border-left:2px solid var(--line);border-top:2px solid var(--line)}
+.taunt:empty{display:none}
+.cardcount{font-weight:800;font-size:13px;color:var(--muted)}
+.taunt-chips{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+.taunt-chip{background:var(--ink2);border:2px solid var(--line);border-radius:999px;padding:8px 14px;
+  font-weight:800;font-size:13px;color:var(--cream);cursor:pointer}
+.taunt-chip.sel{border-color:var(--rose);color:var(--rose);background:rgba(255,92,122,.1)}
 /* phone: draft + hand */
 .draft-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px;margin:12px 0}
 .draft-card{position:relative;aspect-ratio:1/1;border-radius:14px;overflow:hidden;border:3px solid var(--line);cursor:pointer}
@@ -790,6 +802,7 @@ const SFX = (() => {
     vs:      c => { tone(c, { f: 300, f2: 82, type: 'sawtooth', dur: .32, vol: .17 }); noise(c, { dur: .22, vol: .08, from: 2600, to: 300 }); },
     win:     c => { tone(c, { f: 660, type: 'triangle', dur: .12, vol: .15 }); tone(c, { f: 990, type: 'triangle', t: .11, dur: .24, vol: .15 }); },
     whoosh:  c => noise(c, { dur: .55, vol: .24, from: 300, to: 3400 }),
+    heart:   c => { tone(c, { f: 95, f2: 48, type: 'sine', dur: .14, vol: .45 }); tone(c, { f: 85, f2: 44, type: 'sine', t: .21, dur: .16, vol: .38 }); },
     thump:   c => { tone(c, { f: 150, f2: 42, type: 'sine', dur: .34, vol: .5 }); noise(c, { dur: .09, vol: .16, from: 1400, to: 200 }); },
     fanfare: c => { [523, 659, 784, 1046, 1318].forEach((f, i) => tone(c, { f, type: 'triangle', t: i * .12, dur: .32, vol: .15 }));
                     [262, 330, 392].forEach(f => tone(c, { f, type: 'sine', t: .6, dur: .9, vol: .09 })); },
@@ -1224,9 +1237,14 @@ const TV = (() => {
     setTimeout(() => m.remove(), 2000);
   }
 
+  let hbTimer = null;
   /* ---------- render dispatcher ---------- */
   function render() {
     const st = room.state;
+    // sudden-death heartbeat: only while a rematch duel is being picked
+    const wantHB = st === 'sdDuel' && room.showdown && room.showdown.duel && room.showdown.duel.rematch;
+    if (wantHB && !hbTimer) hbTimer = setInterval(() => SFX.play('heart'), 1150);
+    if (!wantHB && hbTimer) { clearInterval(hbTimer); hbTimer = null; }
     if (st === 'lobby') renderLobby();
     else if (st === 'vote') renderVote();
     else if (st === 'reveal') { if (once('reveal:' + room.round)) playReveal(); }
@@ -1670,7 +1688,7 @@ const TV = (() => {
     const ps = players(), ids = ps.map(([pid]) => pid);
     const libS = await db.ref('library').once('value');
     const urls = shuffle(Object.values(libS.val() || {}).map(i => i.url));
-    const deal = Math.min(10, Math.floor(urls.length / ids.length));
+    const deal = Math.min(15, Math.floor(urls.length / ids.length));
     if (deal < 5) { toast(`Showdown needs at least ${ids.length * 5} photos in the library (you have ${urls.length}).`); return; }
     const keep = Math.min(6, deal - 1);
     const hands = {};
@@ -1683,7 +1701,7 @@ const TV = (() => {
     playStartFx();
     R().update({
       state: 'sdDraft', mode: 'showdown',
-      showdown: { deal, keep, hands, kept: null, used: null, schedule: shuffle(pairs), duelIdx: 0, duel: null, scores }
+      showdown: { deal, keep, hands, kept: null, used: null, schedule: shuffle(pairs), duelIdx: 0, duel: null, scores, sweeps: null, finale: false }
     });
   }
 
@@ -1713,14 +1731,29 @@ const TV = (() => {
     }
   }
 
-  function startDuel(idx, rematchPair) {
+  function startDuel(idx, rematchPair, keepFinale) {
     const sd = room.showdown;
-    if (!rematchPair && idx >= sd.schedule.length) { R().update({ state: 'sdFinal' }); return; }
+    if (!rematchPair && idx >= sd.schedule.length) {
+      if (!sd.finale) {
+        // GRAND FINALE: top two on points (tiebreak: sweeps, then coin)
+        const ranked = players().map(([pid]) => pid).sort((a, b) =>
+          (((sd.scores || {})[b] || 0) - ((sd.scores || {})[a] || 0)) ||
+          (((sd.sweeps || {})[b] || 0) - ((sd.sweeps || {})[a] || 0)) ||
+          (Math.random() - .5));
+        R().update({
+          state: 'sdDuel', 'showdown/finale': true, 'showdown/duelIdx': idx,
+          'showdown/duel': { a: ranked[0], b: ranked[1], cards: null, taunts: null, votes: null, flip: null, rematch: 0, finale: true }
+        });
+        return;
+      }
+      R().update({ state: 'sdFinal' });
+      return;
+    }
     const [a, b] = rematchPair || sd.schedule[idx];
     R().update({
       state: 'sdDuel',
       'showdown/duelIdx': idx,
-      'showdown/duel': { a, b, cards: null, votes: null, flip: null, rematch: rematchPair ? (((sd.duel || {}).rematch || 0) + 1) : 0 }
+      'showdown/duel': { a, b, cards: null, taunts: null, votes: null, flip: null, rematch: rematchPair ? (((sd.duel || {}).rematch || 0) + 1) : 0, finale: !!keepFinale }
     });
   }
 
@@ -1728,20 +1761,31 @@ const TV = (() => {
     const sd = room.showdown, d = sd.duel;
     const A = room.players[d.a], B = room.players[d.b];
     const cards = d.cards || {};
-    const key = `sdDuel:${sd.duelIdx}:${d.rematch || 0}`;
-    if (once('snd:' + key)) SFX.play('vs');
+    const remCount = pid => {
+      const kept = ((sd.kept || {})[pid]) || [], used = ((sd.used || {})[pid]) || [];
+      const n = kept.filter(u => !used.includes(u)).length;
+      return d.finale && n === 0 ? kept.length : n;   // finale revives an empty hand
+    };
+    const key = `sdDuel:${sd.duelIdx}:${d.rematch || 0}:${d.finale ? 'F' : ''}`;
+    if (once('snd:' + key)) {
+      if (d.finale && !d.rematch) { megaSplash('GRAND FINALE!'); SFX.play('fanfare'); confettiBurst(40); }
+      else SFX.play('vs');
+    }
+    const cap = d.finale
+      ? (d.rematch ? '🔥 Finale sudden death<span class="accent">!</span>' : '🏆 Grand Finale — worth <span class="accent">2 points</span>')
+      : (d.rematch ? '🔥 Sudden death<span class="accent">!</span>' : `Duel <span class="accent">${sd.duelIdx + 1}</span> of ${sd.schedule.length}`);
     stage().innerHTML = `
       ${scoreStrip()}
-      <div class="tv-caption">${d.rematch ? '🔥 Sudden death<span class="accent">!</span>' : `Duel <span class="accent">${sd.duelIdx + 1}</span> of ${sd.schedule.length}`}</div>
+      <div class="tv-caption">${cap}</div>
       <div class="sd-duelists">
-        <div class="sd-duelist${cards[d.a] ? ' ready' : ''}">${pav(A.avatar)}<b>${esc(A.name)}</b><span class="waitTag">${cards[d.a] ? 'card locked ✓' : 'choosing…'}</span></div>
+        <div class="sd-duelist${cards[d.a] ? ' ready' : ''}">${pav(A.avatar)}<b>${esc(A.name)}</b><span class="cardcount">🃏 ${remCount(d.a)} left</span><span class="waitTag">${cards[d.a] ? 'card locked ✓' : 'choosing…'}</span></div>
         <div class="sd-cardback">💘</div>
-        <div class="vs-badge">VS</div>
+        <div class="vs-badge">${d.finale ? '🏆' : 'VS'}</div>
         <div class="sd-cardback">💘</div>
-        <div class="sd-duelist${cards[d.b] ? ' ready' : ''}">${pav(B.avatar)}<b>${esc(B.name)}</b><span class="waitTag">${cards[d.b] ? 'card locked ✓' : 'choosing…'}</span></div>
+        <div class="sd-duelist${cards[d.b] ? ' ready' : ''}">${pav(B.avatar)}<b>${esc(B.name)}</b><span class="cardcount">🃏 ${remCount(d.b)} left</span><span class="waitTag">${cards[d.b] ? 'card locked ✓' : 'choosing…'}</span></div>
       </div>
-      <div class="tv-sub">Both play a card in secret — then the room decides.</div>`;
-    if (cards[d.a] && cards[d.b] && once(`sdCards:${sd.duelIdx}:${d.rematch || 0}`)) {
+      <div class="tv-sub">${d.finale ? 'Winner takes the crown. No pressure.' : 'Both play a card in secret — then the room decides.'}</div>`;
+    if (cards[d.a] && cards[d.b] && once(`sdCards:${sd.duelIdx}:${d.rematch || 0}:${d.finale ? 'F' : ''}`)) {
       R().update({ state: 'sdVote', 'showdown/duel/flip': Math.random() < .5 ? 1 : 0 });
     }
   }
@@ -1751,18 +1795,19 @@ const TV = (() => {
     const sd = room.showdown, d = sd.duel;
     const votes = d.votes || {};
     const [L, Rr] = d.flip ? [d.b, d.a] : [d.a, d.b];
-    const vk = `sdVote:${sd.duelIdx}:${d.rematch || 0}`;
+    const vk = `sdVote:${sd.duelIdx}:${d.rematch || 0}:${d.finale ? 'F' : ''}`;
     if (sdVoteKey !== vk || !$('#sdVoters')) {
       sdVoteKey = vk;
       renderSdVoteTV._prev = 0;
       if (once('snd:' + vk)) SFX.play('whoosh');
+      const taunts = d.taunts || {};
       stage().innerHTML = `
         ${scoreStrip()}
-        <div class="tv-caption">Who wins this one<span class="accent">?</span></div>
+        <div class="tv-caption">${d.finale ? '🏆 ' : ''}Who wins this one<span class="accent">?</span></div>
         <div class="sd-votewrap">
-          <div class="sd-votecard"><img src="${(d.cards || {})[L]}" alt=""></div>
+          <div class="sd-col"><div class="sd-votecard"><img src="${(d.cards || {})[L]}" alt=""></div><div class="taunt">${taunts[L] ? '“' + esc(taunts[L]) + '”' : ''}</div></div>
           <div class="vs-badge">VS</div>
-          <div class="sd-votecard"><img src="${(d.cards || {})[Rr]}" alt=""></div>
+          <div class="sd-col"><div class="sd-votecard"><img src="${(d.cards || {})[Rr]}" alt=""></div><div class="taunt">${taunts[Rr] ? '“' + esc(taunts[Rr]) + '”' : ''}</div></div>
         </div>
         <div class="tv-sub">Audience: vote on your phones — you don't know whose card is whose 👀</div>
         <div class="sd-voters" id="sdVoters"></div>`;
@@ -1785,19 +1830,28 @@ const TV = (() => {
     const sd = room.showdown, d = sd.duel;
     const votes = d.votes || {};
     const [L, Rr] = d.flip ? [d.b, d.a] : [d.a, d.b];
+    const taunts = d.taunts || {};
     const lCount = Object.values(votes).filter(v => v === 0).length;
     const rCount = Object.values(votes).filter(v => v === 1).length;
     stage().innerHTML = `
       ${scoreStrip()}
       <div class="tv-caption">The room has spoken<span class="accent">!</span></div>
       <div class="sd-votewrap">
-        <div class="sd-votecard" id="sdL"><img src="${(d.cards || {})[L]}" alt=""><div class="votecount">${lCount}</div></div>
-        <div class="vs-badge">VS</div>
-        <div class="sd-votecard" id="sdR"><img src="${(d.cards || {})[Rr]}" alt=""><div class="votecount">${rCount}</div></div>
+        <div class="sd-col"><div class="sd-votecard" id="sdL"><img src="${(d.cards || {})[L]}" alt=""><div class="votecount" id="cntL">0</div></div><div class="taunt">${taunts[L] ? '“' + esc(taunts[L]) + '”' : ''}</div></div>
+        <div class="vs-badge">${d.finale ? '🏆' : 'VS'}</div>
+        <div class="sd-col"><div class="sd-votecard" id="sdR"><img src="${(d.cards || {})[Rr]}" alt=""><div class="votecount" id="cntR">0</div></div><div class="taunt">${taunts[Rr] ? '“' + esc(taunts[Rr]) + '”' : ''}</div></div>
       </div>
       <div class="tv-sub" id="sdSub"></div>`;
-    SFX.play('stamp');
-    await sleep(1400);
+    // tick the votes up one by one
+    await sleep(700);
+    const order = shuffle(Object.values(votes));
+    let l = 0, r = 0;
+    for (const v of order) {
+      if (v === 0) $('#cntL').textContent = ++l; else $('#cntR').textContent = ++r;
+      SFX.play('lock');
+      await sleep(order.length > 4 ? 420 : 560);
+    }
+    await sleep(700);
     // reveal ownership
     const own = (elId, opid) => {
       const p = room.players[opid];
@@ -1819,6 +1873,7 @@ const TV = (() => {
       // tie → sudden death if both still have cards, else coin flip
       megaSplash('TIE!', true); SFX.play('vs');
       const hasCards = p2 => {
+        if (d.finale) return true;   // finale revives empty hands
         const kept = ((sd.kept || {})[p2]) || [];
         const used = [...((((sd.used || {})[p2]) || [])), (d.cards || {})[p2]];
         return kept.some(url => !used.includes(url));
@@ -1826,16 +1881,16 @@ const TV = (() => {
       await sleep(1900);
       if (hasCards(d.a) && hasCards(d.b) && (d.rematch || 0) < 2) {
         await R().update(u);
-        startDuel(sd.duelIdx, [d.a, d.b]);
+        startDuel(sd.duelIdx, [d.a, d.b], d.finale);
         return;
       }
       const winner = Math.random() < .5 ? d.a : d.b;
-      $('#sdSub').innerHTML = `🪙 Out of cards — the coin says <b style="color:var(--gold)">${esc(room.players[winner].name)}</b>!`;
-      u[`showdown/scores/${winner}`] = ((sd.scores || {})[winner] || 0) + 1;
+      $('#sdSub').innerHTML = `🪙 The coin says <b style="color:var(--gold)">${esc(room.players[winner].name)}</b>!`;
+      u[`showdown/scores/${winner}`] = ((sd.scores || {})[winner] || 0) + (d.finale ? 2 : 1);
       SFX.play('win');
       await sleep(2200);
       await R().update(u);
-      startDuel(sd.duelIdx + 1);
+      startDuel(d.finale ? sd.schedule.length : sd.duelIdx + 1);
       return;
     }
 
@@ -1845,18 +1900,19 @@ const TV = (() => {
     $('#sd' + (winSide === 'L' ? 'R' : 'L')).classList.add('loser');
     SFX.play('win');
     const sweep = (winSide === 'L' ? rCount : lCount) === 0 && Object.keys(votes).length >= 2;
-    let pts = 1;
+    let pts = d.finale ? 2 : 1;
     if (sweep) {
       await sleep(500);
       megaSplash('SWEEP! +1');
       SFX.play('gold'); confettiBurst(60);
-      pts = 2;
+      pts += 1;
+      u[`showdown/sweeps/${winner}`] = ((sd.sweeps || {})[winner] || 0) + 1;
     }
-    $('#sdSub').innerHTML = `<b style="color:var(--gold)">${esc(room.players[winner].name)}</b> takes it${sweep ? ' — unanimous, double points!' : '!'}`;
+    $('#sdSub').innerHTML = `<b style="color:var(--gold)">${esc(room.players[winner].name)}</b> takes it${d.finale ? ' — and the finale!' : sweep ? ' — unanimous, bonus point!' : '!'}`;
     u[`showdown/scores/${winner}`] = ((sd.scores || {})[winner] || 0) + pts;
     await sleep(sweep ? 2600 : 2400);
     await R().update(u);
-    startDuel(sd.duelIdx + 1);
+    startDuel(d.finale ? sd.schedule.length : sd.duelIdx + 1);
   }
 
   function renderSdFinal() {
@@ -2211,19 +2267,28 @@ const Player = (() => {
     const sd = room.showdown;
     const kept = ((sd.kept || {})[pid]) || [];
     const used = ((sd.used || {})[pid]) || [];
-    return kept.filter(u => !used.includes(u));
+    const rem = kept.filter(u => !used.includes(u));
+    // grand finale revives an empty hand
+    return (rem.length === 0 && (sd.duel || {}).finale) ? kept : rem;
   };
 
-  let handSel = null;
+  const TAUNTS = [
+    "She's out of your league", "Objectively correct", "Don't embarrass yourself",
+    "My grandma could win with this", "Easy money", "I didn't even need my best card",
+    "You're voting for her. Admit it.", "Checkmate.", "This one's for the group chat",
+    "I'm sorry it had to be this way"
+  ];
+
+  let handSel = null, tauntSel = null;
   function renderSdDuelPhone() {
     const sd = room.showdown, d = sd.duel;
     const inDuel = d.a === pid || d.b === pid;
     const cards = d.cards || {};
     if (!inDuel) {
       const A = room.players[d.a], B = room.players[d.b];
-      stage().innerHTML = `<div class="big-emoji">🍿</div>
-        <div class="status-card card"><h3>${esc(A.name)} vs ${esc(B.name)}</h3>
-        <p>They're picking cards in secret — get ready to judge.</p></div>`;
+      stage().innerHTML = `<div class="big-emoji">${d.finale ? '🏆' : '🍿'}</div>
+        <div class="status-card card"><h3>${d.finale ? 'GRAND FINALE: ' : ''}${esc(A.name)} vs ${esc(B.name)}</h3>
+        <p>They're picking cards in secret — get ready to judge${d.finale ? ' the championship' : ''}.</p></div>`;
       return;
     }
     if (cards[pid]) {
@@ -2236,9 +2301,11 @@ const Player = (() => {
     const rem = myRemaining();
     if (handSel && !rem.includes(handSel)) handSel = null;
     stage().innerHTML = `
-      <div class="phone-title">${d.rematch ? '🔥 Sudden death' : '⚔️ Your duel'}</div>
-      <div class="phone-sub">vs <b>${esc(opp.name)}</b> · played cards are gone forever</div>
+      <div class="phone-title">${d.finale ? '🏆 GRAND FINALE' : d.rematch ? '🔥 Sudden death' : '⚔️ Your duel'}</div>
+      <div class="phone-sub">vs <b>${esc(opp.name)}</b>${d.finale ? ' · winner takes the crown' : ' · played cards are gone forever'}</div>
       <div class="hand-scroll" id="handRow"></div>
+      <div class="phone-sub" style="margin-top:4px">Talk your talk (optional — shown anonymously):</div>
+      <div class="taunt-chips" id="tauntRow"></div>
       <button class="btn big" id="playBtn" style="width:100%" disabled>Pick a card</button>`;
     const row = $('#handRow');
     rem.forEach(url => {
@@ -2246,13 +2313,21 @@ const Player = (() => {
       hcard.onclick = () => { handSel = url; if (navigator.vibrate) navigator.vibrate(14); renderSdDuelPhone(); };
       row.appendChild(hcard);
     });
+    const tr = $('#tauntRow');
+    TAUNTS.forEach(t => {
+      const chip = el('div', 'taunt-chip' + (tauntSel === t ? ' sel' : ''), esc(t));
+      chip.onclick = () => { tauntSel = tauntSel === t ? null : t; if (navigator.vibrate) navigator.vibrate(10); renderSdDuelPhone(); };
+      tr.appendChild(chip);
+    });
     const btn = $('#playBtn');
     btn.disabled = !handSel;
-    if (handSel) btn.textContent = 'Play her ▶';
+    if (handSel) btn.textContent = tauntSel ? 'Play her + talk trash ▶' : 'Play her ▶';
     btn.onclick = () => {
       if (!handSel) return;
-      R().child(`showdown/duel/cards/${pid}`).set(handSel);
-      handSel = null;
+      const u = {}; u[`showdown/duel/cards/${pid}`] = handSel;
+      if (tauntSel) u[`showdown/duel/taunts/${pid}`] = tauntSel;
+      R().update(u);
+      handSel = null; tauntSel = null;
     };
   }
 
@@ -2274,12 +2349,14 @@ const Player = (() => {
       return;
     }
     stage().innerHTML = `
-      <div class="phone-title" style="color:var(--teal)">🗳️ You decide</div>
+      <div class="phone-title" style="color:var(--teal)">${d.finale ? '🏆 Finale — you decide' : '🗳️ You decide'}</div>
       <div class="phone-sub">No names attached — pure taste. Tap the winner.</div>
       <div class="pick-col">
         <div class="pick-photo teal-mode" data-i="0"><img src="${cards[L]}" alt=""></div>
+        ${(d.taunts || {})[L] ? `<div class="taunt" style="max-width:100%">“${esc(d.taunts[L])}”</div>` : ''}
         <div class="or-divider" style="color:var(--teal)">— or —</div>
         <div class="pick-photo teal-mode" data-i="1"><img src="${cards[Rr]}" alt=""></div>
+        ${(d.taunts || {})[Rr] ? `<div class="taunt" style="max-width:100%">“${esc(d.taunts[Rr])}”</div>` : ''}
       </div>`;
     stage().querySelectorAll('.pick-photo').forEach(p => p.onclick = () => {
       if (((room.showdown.duel || {}).votes || {})[pid] != null) return;
