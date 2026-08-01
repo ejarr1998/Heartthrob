@@ -369,8 +369,52 @@ input[type=text]::placeholder{color:#6E5CA8;font-weight:600}
 .waiting-avatars .wa img{width:100%;height:100%;object-fit:cover}
 .waiting-avatars .wa.done{border-color:var(--teal);opacity:1}
 
-/* arrow-through-heart game start FX */
-.introFx{position:fixed;inset:0;z-index:300;display:flex;align-items:center;justify-content:center;overflow:hidden;
+/* lobby QR */
+.lobby-qr{background:#fff;padding:12px;border-radius:16px;box-shadow:var(--shadow);line-height:0}
+.lobby-join-row{display:flex;align-items:center;gap:28px;justify-content:center;margin:4px 0 8px}
+
+/* full-screen mega splash (UNANIMOUS / UPSET) */
+.mega{position:fixed;inset:0;z-index:250;display:flex;align-items:center;justify-content:center;pointer-events:none}
+.mega b{font-family:'Bungee';font-size:clamp(56px,11vw,150px);letter-spacing:.04em;color:var(--gold);
+  text-shadow:0 8px 0 rgba(0,0,0,.45), 0 0 70px rgba(255,194,75,.55);
+  animation:megaIn 1.9s cubic-bezier(.2,1.5,.3,1) both}
+.mega.rose b{color:var(--rose);text-shadow:0 8px 0 rgba(0,0,0,.45), 0 0 70px rgba(255,92,122,.6)}
+@keyframes megaIn{0%{opacity:0;transform:scale(3.4) rotate(-6deg)}12%{opacity:1;transform:scale(1) rotate(-3deg)}
+  80%{opacity:1;transform:scale(1.04) rotate(-3deg)}100%{opacity:0;transform:scale(1.1) rotate(-3deg)}}
+
+/* awards */
+.awards-scroll{align-self:stretch;flex:1;min-height:0;width:100%;overflow-y:auto;display:flex}
+.awards-inner{margin:auto;display:flex;flex-direction:column;align-items:center;width:100%;padding:12px 0}
+.award-grid{display:flex;flex-wrap:wrap;gap:22px;justify-content:center;max-width:1150px}
+.award-card{width:230px;padding:18px 16px;text-align:center;animation:popIn .5s cubic-bezier(.2,1.5,.4,1) both}
+.award-card:nth-child(2){animation-delay:.45s}.award-card:nth-child(3){animation-delay:.9s}.award-card:nth-child(4){animation-delay:1.35s}
+.award-card .award-emoji{font-size:40px;margin-bottom:6px}
+.award-card h3{font-family:'Bungee';font-size:17px;margin:10px 0 6px;color:var(--gold)}
+.award-card p{color:var(--muted);font-weight:700;font-size:13px;line-height:1.45}
+.award-card .award-photo{width:150px;height:150px;border-radius:16px;overflow:hidden;border:3px solid var(--rose);margin:0 auto;box-shadow:var(--shadow)}
+.award-card .award-photo img{width:100%;height:100%;object-fit:cover}
+.award-card .award-people{display:flex;justify-content:center;gap:8px}
+.award-card .award-people .pav{width:76px;height:76px}
+.award-name{font-weight:800;color:var(--cream);font-size:15px;margin-top:8px}
+
+/* compatibility matrix */
+.compat-wrap{margin-top:26px;text-align:center;animation:popIn .5s 1.7s cubic-bezier(.2,1.5,.4,1) both}
+.compat-wrap h3{font-family:'Bungee';font-size:18px;margin-bottom:12px}
+.compat-table{border-collapse:separate;border-spacing:5px;margin:0 auto}
+.compat-table .pav{width:44px;height:44px;margin:0 auto}
+.compat-table td{background:var(--ink2);border:1px solid var(--line);border-radius:10px;min-width:56px;height:48px;
+  font-weight:800;font-size:15px;color:var(--cream);text-align:center;padding:0 8px}
+.compat-table td.hd{background:transparent;border:none}
+.compat-table td.self{background:transparent;border:1px dashed var(--line);color:#584a86}
+.compat-table td.best{border-color:var(--gold);color:var(--gold);box-shadow:0 0 14px rgba(255,194,75,.3)}
+.compat-table td.worst{color:#584a86}
+
+/* same-champion callout */
+.match-banner{font-family:'Bungee';font-size:clamp(17px,2.2vw,26px);color:var(--teal);text-align:center;
+  margin:-8px 0 16px;animation:popIn .5s .5s cubic-bezier(.2,1.6,.4,1) both;
+  text-shadow:0 3px 0 rgba(0,0,0,.35)}
+
+/* arrow-through-heart game start FX */.introFx{position:fixed;inset:0;z-index:300;display:flex;align-items:center;justify-content:center;overflow:hidden;
   background:radial-gradient(ellipse at center, #2A1B52 0%, var(--ink) 70%)}
 .introFx .fxheart{position:relative;font-size:min(44vh,44vw);line-height:1;color:var(--rose);
   filter:drop-shadow(0 14px 0 rgba(0,0,0,.35)) drop-shadow(0 0 60px rgba(255,92,122,.45));
@@ -570,6 +614,7 @@ input[type=text]::placeholder{color:#6E5CA8;font-weight:600}
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
 /* ================================================================
    HEARTTHROB — party game
@@ -1089,6 +1134,12 @@ const TV = (() => {
 
   function pav(av, cls) { return `<div class="pav ${cls || ''}"><img src="${av}" alt=""></div>`; }
 
+  function megaSplash(text, rose) {
+    const m = el('div', 'mega' + (rose ? ' rose' : ''), `<b>${text}</b>`);
+    document.body.appendChild(m);
+    setTimeout(() => m.remove(), 2000);
+  }
+
   /* ---------- render dispatcher ---------- */
   function render() {
     const st = room.state;
@@ -1098,6 +1149,7 @@ const TV = (() => {
     else if (st === 'turnIntro') renderIntro();
     else if (st === 'battle') renderBattle();
     else if (st === 'battleReveal') renderBattleReveal();
+    else if (st === 'awards') { if (once('awards')) renderAwards(); }
     else if (st === 'showcase') { if (once('showcase')) renderShowcase(); }
   }
 
@@ -1109,12 +1161,16 @@ const TV = (() => {
     prevPlayerCount = ps.length;
     const s = stage();
     s.innerHTML = `
-      <div class="tv-sub" style="margin:0">Open <b style="color:var(--cream);font-size:1.2em">${esc(location.origin + location.pathname)}</b> on your phone → enter this code:</div>
-      <div class="lobby-code">${code}</div>
+      <div class="tv-sub" style="margin:0">Scan or open <b style="color:var(--cream);font-size:1.2em">${esc(location.origin + location.pathname)}</b> → enter this code:</div>
+      <div class="lobby-join-row">
+        <div class="lobby-qr" id="lobbyQR"></div>
+        <div class="lobby-code">${code}</div>
+      </div>
       <div class="tv-caption" style="margin:14px 0 0">Who's playing<span class="accent">?</span></div>
       <div class="lobby-grid" id="lobbyGrid"></div>
       <button class="btn big gold" id="startBtn" ${ps.length < 2 ? 'disabled' : ''}>Start the show ▶</button>
       <div class="tv-sub">${ps.length < 2 ? 'Need at least 2 players' : ps.length > 6 ? 'Max 6 players!' : ps.length + ' player' + (ps.length > 1 ? 's' : '') + ' ready'}</div>`;
+    if (window.QRCode) new QRCode($('#lobbyQR'), { text: location.origin + location.pathname, width: 150, height: 150, correctLevel: QRCode.CorrectLevel.M });
     const g = s.querySelector('#lobbyGrid');
     if (!ps.length) g.innerHTML = '<div class="empty-slots">Waiting for the first brave soul<span class="dots"></span></div>';
     ps.forEach(([pid, p]) => {
@@ -1219,9 +1275,16 @@ const TV = (() => {
       await sleep(rank === 1 ? 500 : 850);
     }
     // glow every photo that took a #1
-    new Set(ps.filter(([pid]) => votes[pid]).map(([pid]) => votes[pid][0])).forEach(i => g.children[i].classList.add('won1'));
+    const firstIdx = ps.filter(([pid]) => votes[pid]).map(([pid]) => votes[pid][0]);
+    new Set(firstIdx).forEach(i => g.children[i].classList.add('won1'));
     confettiBurst(36);
     SFX.play('gold');
+    if (firstIdx.length > 1 && firstIdx.every(i => i === firstIdx[0])) {
+      await sleep(500);
+      megaSplash('UNANIMOUS!');
+      SFX.play('fanfare');
+      confettiBurst(90);
+    }
     const sub = $('#revealSub');
     const next = el('button', 'btn gold', room.round < 9 ? `Round ${room.round + 2} ▶` : 'To the faceoffs! ⚔️');
     next.onclick = () => {
@@ -1311,7 +1374,14 @@ const TV = (() => {
     const b = room.battle, preds = b.predictions || {};
     battleScreenKey = '';
     battleShell('');
-    if (once(`winSnd:${room.phase}:${room.turnIdx}:${b.num}`)) SFX.play('win');
+    if (once(`winSnd:${room.phase}:${room.turnIdx}:${b.num}`)) {
+      SFX.play('win');
+      const guesses = Object.values(preds);
+      const right = guesses.filter(g => g === b.pick).length;
+      if (guesses.length >= 2 && right < guesses.length - right) {
+        setTimeout(() => { megaSplash('UPSET!', true); SFX.play('vs'); }, 500);
+      }
+    }
     $('#bpA').classList.add(b.pick === 0 ? 'winner' : 'loser');
     $('#bpB').classList.add(b.pick === 1 ? 'winner' : 'loser');
     const row = $('#predRow');
@@ -1331,6 +1401,14 @@ const TV = (() => {
     const b = room.battle;
     const winner = b.pick === 0 ? b.a : b.b;
     const u = {};
+    // accumulate how predictable this player is (for the "Easiest to Read" award)
+    const preds = b.predictions || {};
+    const total = Object.keys(preds).length;
+    if (total) {
+      const right = Object.values(preds).filter(g => g === b.pick).length;
+      const prev = (room.predStats || {})[b.pid] || { right: 0, total: 0 };
+      u[`predStats/${b.pid}`] = { right: prev.right + right, total: prev.total + total };
+    }
     let finishedTurn = false, finishedTop5 = null;
     if (b.kind === 'faceoff') {
       const winners = [...(b.winners || []), winner];
@@ -1358,10 +1436,100 @@ const TV = (() => {
         const pool = shuffle(firstTop5);
         u.battle = { kind: 'final', pid: order[0], a: pool[0], b: pool[1], pool: pool.slice(2), num: 1, total: 4, pick: null, predictions: null };
       } else {
-        u.state = 'showcase'; u.battle = null;
+        u.state = 'awards'; u.battle = null;
       }
     }
     R().update(u);
+  }
+
+  /* ---------- awards (superlatives + compatibility) ---------- */
+  function renderAwards() {
+    const ps = players(), ids = ps.map(([pid]) => pid);
+    const P = pid => room.players[pid];
+
+    // — The Heartbreaker: photo with the most #1 votes all game
+    const tally = {};
+    for (let r = 0; r < 10; r++) {
+      const vr = (room.votes || {})[r] || {};
+      ids.forEach(pid => { const v = vr[pid]; if (v) { const url = room.rounds[r][v[0]]; tally[url] = (tally[url] || 0) + 1; } });
+    }
+    const hb = Object.entries(tally).sort((a, b) => b[1] - a[1])[0];
+
+    // — pairwise ranking distance (Spearman footrule, normalized 0..1)
+    const rankVec = (pid, r) => {
+      const v = ((room.votes || {})[r] || {})[pid]; if (!v) return null;
+      const ranks = [0, 0, 0, 0]; v.forEach((photoIdx, pos) => ranks[photoIdx] = pos + 1); return ranks;
+    };
+    const norm = {};
+    for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) {
+      let d = 0, c = 0;
+      for (let r = 0; r < 10; r++) {
+        const A = rankVec(ids[i], r), B = rankVec(ids[j], r);
+        if (A && B) { c++; for (let k = 0; k < 4; k++) d += Math.abs(A[k] - B[k]); }
+      }
+      norm[ids[i] + '|' + ids[j]] = c ? d / (8 * c) : .5;
+    }
+    const compat = k => Math.round((1 - norm[k]) * 100);
+
+    let cards = '';
+    if (hb) cards += `<div class="award-card card"><div class="award-emoji">💔</div>
+      <div class="award-photo"><img src="${hb[0]}" alt=""></div>
+      <h3>The Heartbreaker</h3><p>Took <b style="color:var(--cream)">${hb[1]}</b> first-place heart${hb[1] > 1 ? 's' : ''} tonight — the room's collective weakness.</p></div>`;
+
+    if (ids.length >= 3) {
+      const pairs = Object.entries(norm);
+      const twins = pairs.reduce((a, b) => b[1] < a[1] ? b : a);
+      const [tA, tB] = twins[0].split('|');
+      cards += `<div class="award-card card"><div class="award-emoji">👯</div>
+        <div class="award-people">${pav(P(tA).avatar)}${pav(P(tB).avatar)}</div>
+        <div class="award-name">${esc(P(tA).name)} & ${esc(P(tB).name)}</div>
+        <h3>Twin Flames</h3><p>${compat(twins[0])}% matching taste. Basically the same person.</p></div>`;
+
+      const avg = ids.map(pid => {
+        let s = 0, n = 0;
+        pairs.forEach(([k, v]) => { if (k.split('|').includes(pid)) { s += v; n++; } });
+        return [pid, n ? s / n : 0];
+      }).reduce((a, b) => b[1] > a[1] ? b : a);
+      cards += `<div class="award-card card"><div class="award-emoji">🐺</div>
+        <div class="award-people">${pav(P(avg[0]).avatar)}</div>
+        <div class="award-name">${esc(P(avg[0]).name)}</div>
+        <h3>The Contrarian</h3><p>Furthest from everyone else's rankings. Marches to his own heartbeat.</p></div>`;
+    }
+
+    const ez = Object.entries(room.predStats || {}).filter(([, s]) => s.total > 0)
+      .map(([pid, s]) => [pid, s.right / s.total, s]).sort((a, b) => b[1] - a[1])[0];
+    if (ez) cards += `<div class="award-card card"><div class="award-emoji">📖</div>
+      <div class="award-people">${pav(P(ez[0]).avatar)}</div>
+      <div class="award-name">${esc(P(ez[0]).name)}</div>
+      <h3>Easiest to Read</h3><p>The room called <b style="color:var(--cream)">${ez[2].right} of ${ez[2].total}</b> of his picks. Zero mystery.</p></div>`;
+
+    // — compatibility matrix
+    let matrix = '';
+    if (ids.length >= 2) {
+      const vals = Object.values(norm);
+      const best = Math.min(...vals), worst = Math.max(...vals);
+      let rows = '<tr><td class="hd"></td>' + ids.map(pid => `<td class="hd">${pav(P(pid).avatar)}</td>`).join('') + '</tr>';
+      ids.forEach((a, i) => {
+        rows += '<tr><td class="hd">' + pav(P(a).avatar) + '</td>' + ids.map((b2, j) => {
+          if (i === j) return '<td class="self">—</td>';
+          const k = i < j ? a + '|' + b2 : b2 + '|' + a;
+          const cls = vals.length > 1 ? (norm[k] === best ? ' class="best"' : norm[k] === worst ? ' class="worst"' : '') : '';
+          return `<td${cls}>${compat(k)}%</td>`;
+        }).join('') + '</tr>';
+      });
+      matrix = `<div class="compat-wrap"><h3>💞 Taste compatibility</h3><table class="compat-table">${rows}</table></div>`;
+    }
+
+    SFX.play('gold');
+    confettiBurst(50);
+    stage().innerHTML = `
+      <div class="awards-scroll"><div class="awards-inner">
+        <div class="tv-caption">The awards<span class="accent">!</span></div>
+        <div class="award-grid">${cards}</div>
+        ${matrix}
+        <div class="tv-sub" style="margin-top:22px"><button class="btn big gold" id="toShowcase">And the champions are… 👑</button></div>
+      </div></div>`;
+    $('#toShowcase').onclick = () => R().update({ state: 'showcase' });
   }
 
   /* ---------- finale ---------- */
@@ -1376,10 +1544,18 @@ const TV = (() => {
         <div class="who">${pav(p.avatar)}<b>${esc(p.name)}</b></div>
       </div>`;
     }).join('');
+    // same-champion detection
+    const byUrl = {};
+    room.turnOrder.forEach(pid => { const u = room.finalPick[pid]; (byUrl[u] = byUrl[u] || []).push(pid); });
+    const match = Object.values(byUrl).find(g => g.length > 1);
+    const matchBanner = match
+      ? `<div class="match-banner">👀 ${match.map(pid => esc(room.players[pid].name)).join(' & ')} have the SAME type!</div>` : '';
     stage().innerHTML = `
       <div class="tv-caption">And their hearts belong to<span class="accent">…</span></div>
+      ${matchBanner}
       <div class="showcase-grid">${cards}</div>
       <div class="tv-sub" style="margin-top:24px"><button class="btn ghost" id="againBtn">🔁 New game</button></div>`;
+    if (match) setTimeout(() => SFX.play('win'), 600);
     $('#againBtn').onclick = () => { sessionStorage.removeItem('ht_tv'); location.reload(); };
   }
 
@@ -1459,7 +1635,13 @@ const Player = (() => {
     else if (st === 'turnIntro') renderIntro();
     else if (st === 'battle') renderBattle();
     else if (st === 'battleReveal') renderBattleReveal();
+    else if (st === 'awards') renderAwardsWatch();
     else if (st === 'showcase') renderShowcase();
+  }
+
+  function renderAwardsWatch() {
+    stage().innerHTML = `<div class="big-emoji">🏆</div>
+      <div class="status-card card"><h3>The awards are in!</h3><p>Eyes on the TV — superlatives and compatibility scores are dropping…</p></div>`;
   }
 
   function renderLobby() {
@@ -1641,7 +1823,9 @@ const Player = (() => {
         <div class="mini-photo" style="width:200px;height:200px;margin-top:0"><img src="${finalUrl}" alt=""></div>
         <p style="margin-top:14px">Out of 40 photos and 10 rounds… this is your type.</p>
         <button class="btn teal" id="viewT10" style="margin-top:16px">View Top 10</button>
+        <button class="btn ghost" id="saveCard" style="margin-top:10px">📸 Save recap card</button>
       </div>`;
+    $('#saveCard').onclick = () => buildRecapCard(finalUrl);
     $('#viewT10').onclick = () => {
       const g = $('#t10Grid'); g.innerHTML = '';
       const ten = Object.values(room.top10[pid] || {});
@@ -1653,6 +1837,73 @@ const Player = (() => {
       });
       $('#top10Modal').classList.add('on');
     };
+  }
+
+  /* ---- shareable recap card (canvas → PNG) ---- */
+  async function buildRecapCard(finalUrl) {
+    toast('Building your card…', 6000);
+    try {
+      const five = Object.values(room.top5[pid] || {});
+      const others = five.filter(u => u !== finalUrl).slice(0, 4);
+      const [champ, ...thumbs] = await Promise.all([urlToImage(finalUrl), ...others.map(urlToImage)]);
+      const av = await urlToImage(me.avatar);
+      await document.fonts.load('64px Bungee').catch(() => {});
+
+      const W = 1080, H = 1350;
+      const c = document.createElement('canvas'); c.width = W; c.height = H;
+      const x = c.getContext('2d');
+      const rr = (px, py, w, h, r) => { x.beginPath(); x.roundRect(px, py, w, h, r); };
+
+      // background
+      const bg = x.createLinearGradient(0, 0, 0, H);
+      bg.addColorStop(0, '#241548'); bg.addColorStop(1, '#191036');
+      x.fillStyle = bg; x.fillRect(0, 0, W, H);
+
+      // title
+      x.textAlign = 'center';
+      x.fillStyle = '#FF5C7A'; x.font = '64px Bungee, sans-serif';
+      x.fillText('HEART♥THROB', W / 2, 108);
+      x.fillStyle = '#B7A8E0'; x.font = '800 30px Outfit, sans-serif';
+      x.fillText('found my type', W / 2, 156);
+
+      // avatar + name
+      const AS = 110, ax = W / 2 - AS / 2, ay = 190;
+      x.save(); x.beginPath(); x.arc(W / 2, ay + AS / 2, AS / 2, 0, 7); x.clip();
+      x.drawImage(av, ax, ay, AS, AS); x.restore();
+      x.strokeStyle = '#FF5C7A'; x.lineWidth = 7;
+      x.beginPath(); x.arc(W / 2, ay + AS / 2, AS / 2 + 3, 0, 7); x.stroke();
+      x.fillStyle = '#FFF4E6'; x.font = '800 40px Outfit, sans-serif';
+      x.fillText(me.name, W / 2, ay + AS + 52);
+
+      // champion
+      const CS = 560, cx = W / 2 - CS / 2, cy = 400;
+      rr(cx - 8, cy - 8, CS + 16, CS + 16, 34); x.fillStyle = '#FFC24B'; x.fill();
+      x.save(); rr(cx, cy, CS, CS, 26); x.clip(); x.drawImage(champ, cx, cy, CS, CS); x.restore();
+      x.font = '80px Bungee, sans-serif'; x.fillText('👑', W / 2, cy + 16);
+
+      // rest of top 5
+      const TS = 190, gap = 26, row = others.length * TS + (others.length - 1) * gap;
+      let tx = W / 2 - row / 2, ty = cy + CS + 60;
+      x.fillStyle = '#B7A8E0'; x.font = '800 26px Outfit, sans-serif';
+      x.fillText('· the runners-up ·', W / 2, ty - 14);
+      thumbs.forEach(img => {
+        x.save(); rr(tx, ty, TS, TS, 18); x.clip(); x.drawImage(img, tx, ty, TS, TS); x.restore();
+        rr(tx, ty, TS, TS, 18); x.strokeStyle = '#3FE0C5'; x.lineWidth = 4; x.stroke();
+        tx += TS + gap;
+      });
+
+      x.fillStyle = '#6E5CA8'; x.font = '700 24px Outfit, sans-serif';
+      x.fillText('10 rounds · 40 faces · 1 heart', W / 2, H - 44);
+
+      c.toBlob(blob => {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `heartthrob-${me.name.toLowerCase().replace(/[^a-z0-9]/g, '')}.png`;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+        toast('Card saved 📸 — send it to the group chat');
+      }, 'image/png');
+    } catch (e) { console.error(e); toast("Couldn't build the card — photo didn't load."); }
   }
 
   return { resume };
