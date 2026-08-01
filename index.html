@@ -402,7 +402,8 @@ input[type=text]::placeholder{color:#6E5CA8;font-weight:600}
 .award-name{font-weight:800;color:var(--cream);font-size:15px;margin-top:10px}
 
 /* compatibility matrix */
-.compat-wrap{margin-top:26px;text-align:center;animation:popIn .5s 1.7s cubic-bezier(.2,1.5,.4,1) both}
+.awards-bottom{display:flex;flex-wrap:wrap;gap:clamp(24px,4vw,64px);align-items:flex-start;justify-content:center;margin-top:26px}
+.compat-wrap{text-align:center;animation:popIn .5s 1.7s cubic-bezier(.2,1.5,.4,1) both}
 .compat-wrap h3{font-family:'Bungee';font-size:18px;margin-bottom:12px}
 .compat-table{border-collapse:separate;border-spacing:5px;margin:0 auto}
 .compat-table .pav{width:44px;height:44px;margin:0 auto;border-width:3px}
@@ -413,10 +414,29 @@ input[type=text]::placeholder{color:#6E5CA8;font-weight:600}
 .compat-table td.best{border-color:var(--gold);color:var(--gold);box-shadow:0 0 14px rgba(255,194,75,.3)}
 .compat-table td.worst{color:#584a86}
 
+/* everyone's top 5 on the awards screen */
+.top5-wrap{text-align:center;animation:popIn .5s 1.9s cubic-bezier(.2,1.5,.4,1) both}
+.top5-wrap h3{font-family:'Bungee';font-size:18px;margin-bottom:12px}
+.t5row{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.t5row .pav{width:44px;height:44px}
+.t5row>b{font-weight:800;font-size:15px;min-width:86px;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.t5thumbs{display:flex;gap:7px}
+.t5thumb{position:relative;width:62px;height:62px;border-radius:12px;overflow:hidden;border:2px solid var(--line);flex:none}
+.t5thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.t5thumb.champ{border-color:var(--gold);box-shadow:0 0 12px rgba(255,194,75,.4)}
+.t5thumb.champ span{position:absolute;top:-2px;right:1px;font-size:15px;filter:drop-shadow(0 2px 1px rgba(0,0,0,.6))}
+
 /* same-champion callout */
 .match-banner{font-family:'Bungee';font-size:clamp(17px,2.2vw,26px);color:var(--teal);text-align:center;
   margin:-8px 0 16px;animation:popIn .5s .5s cubic-bezier(.2,1.6,.4,1) both;
   text-shadow:0 3px 0 rgba(0,0,0,.35)}
+
+/* recap card preview modal */
+.recap-modal{position:fixed;inset:0;z-index:320;background:rgba(12,6,30,.92);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:14px;padding:20px}
+.recap-modal img{max-width:min(86vw,420px);max-height:62vh;border-radius:18px;box-shadow:var(--shadow);border:2px solid var(--line)}
+.recap-modal p{color:var(--muted);font-weight:700;font-size:14px;text-align:center}
+.recap-modal .row{display:flex;gap:12px}
 
 /* arrow-through-heart game start FX */.introFx{position:fixed;inset:0;z-index:300;display:flex;align-items:center;justify-content:center;overflow:hidden;
   background:radial-gradient(ellipse at center, #2A1B52 0%, var(--ink) 70%)}
@@ -1531,13 +1551,22 @@ const TV = (() => {
       matrix = `<div class="compat-wrap"><h3>💞 Taste compatibility</h3><table class="compat-table">${rows}</table></div>`;
     }
 
+    // — everyone's Top 5, champion outlined gold
+    const t5rows = ids.map(pid => {
+      const five = Object.values((room.top5 || {})[pid] || {});
+      const champ = (room.finalPick || {})[pid];
+      const thumbs = five.map(u => `<div class="t5thumb${u === champ ? ' champ' : ''}"><img src="${u}" alt="">${u === champ ? '<span>👑</span>' : ''}</div>`).join('');
+      return `<div class="t5row">${pav(P(pid).avatar)}<b>${esc(P(pid).name)}</b><div class="t5thumbs">${thumbs}</div></div>`;
+    }).join('');
+    const top5Panel = `<div class="top5-wrap"><h3>💘 The Top 5s</h3>${t5rows}</div>`;
+
     SFX.play('gold');
     confettiBurst(50);
     stage().innerHTML = `
       <div class="awards-scroll"><div class="awards-inner">
         <div class="tv-caption">The awards<span class="accent">!</span></div>
         <div class="award-grid">${cards}</div>
-        ${matrix}
+        <div class="awards-bottom">${matrix}${top5Panel}</div>
         <div class="tv-sub" style="margin-top:22px"><button class="btn big gold" id="toShowcase">And the champions are… 👑</button></div>
       </div></div>`;
     $('#toShowcase').onclick = () => R().update({ state: 'showcase' });
@@ -1652,7 +1681,22 @@ const Player = (() => {
 
   function renderAwardsWatch() {
     stage().innerHTML = `<div class="big-emoji">🏆</div>
-      <div class="status-card card"><h3>The awards are in!</h3><p>Eyes on the TV — superlatives and compatibility scores are dropping…</p></div>`;
+      <div class="status-card card"><h3>The awards are in!</h3><p>Eyes on the TV — superlatives and compatibility scores are dropping…</p>
+      <button class="btn teal" id="viewT10" style="margin-top:16px">View my Top 10</button></div>`;
+    $('#viewT10').onclick = openTop10;
+  }
+
+  function openTop10() {
+    const finalUrl = (room.finalPick || {})[pid];
+    const g = $('#t10Grid'); g.innerHTML = '';
+    const ten = Object.values(room.top10[pid] || {});
+    const five = new Set(Object.values(room.top5[pid] || {}));
+    ten.forEach(url => {
+      const isF = url === finalUrl;
+      const d = el('div', 't10' + (isF ? ' is-final' : ''), `<img src="${url}" alt="">` + (isF ? '<span class="fbadge">WINNER</span>' : five.has(url) ? '<span class="fbadge" style="background:var(--teal);color:#0B3A32">TOP 5</span>' : ''));
+      g.appendChild(d);
+    });
+    $('#top10Modal').classList.add('on');
   }
 
   function renderLobby() {
@@ -1837,27 +1881,24 @@ const Player = (() => {
         <button class="btn ghost" id="saveCard" style="margin-top:10px">📸 Save recap card</button>
       </div>`;
     $('#saveCard').onclick = () => buildRecapCard(finalUrl);
-    $('#viewT10').onclick = () => {
-      const g = $('#t10Grid'); g.innerHTML = '';
-      const ten = Object.values(room.top10[pid] || {});
-      const five = new Set(Object.values(room.top5[pid] || {}));
-      ten.forEach(url => {
-        const isF = url === finalUrl;
-        const d = el('div', 't10' + (isF ? ' is-final' : ''), `<img src="${url}" alt="">` + (isF ? '<span class="fbadge">WINNER</span>' : five.has(url) ? '<span class="fbadge" style="background:var(--teal);color:#0B3A32">TOP 5</span>' : ''));
-        g.appendChild(d);
-      });
-      $('#top10Modal').classList.add('on');
-    };
+    $('#viewT10').onclick = openTop10;
   }
 
   /* ---- shareable recap card (canvas → PNG) ---- */
+  // cache-busted load: the page already cached these images WITHOUT CORS headers,
+  // so a plain crossOrigin load can hit the tainted cached copy and break canvas export
+  const imgForCanvas = src => src.startsWith('data:') ? urlToImage(src) : new Promise((res, rej) => {
+    const i = new Image(); i.crossOrigin = 'anonymous';
+    i.onload = () => res(i); i.onerror = rej;
+    i.src = src + (src.includes('?') ? '&' : '?') + 'ccb=1';
+  });
+
   async function buildRecapCard(finalUrl) {
     toast('Building your card…', 6000);
     try {
       const five = Object.values(room.top5[pid] || {});
       const others = five.filter(u => u !== finalUrl).slice(0, 4);
-      const [champ, ...thumbs] = await Promise.all([urlToImage(finalUrl), ...others.map(urlToImage)]);
-      const av = await urlToImage(me.avatar);
+      const [champ, av, ...thumbs] = await Promise.all([imgForCanvas(finalUrl), imgForCanvas(me.avatar), ...others.map(u => imgForCanvas(u))]);
       await document.fonts.load('64px Bungee').catch(() => {});
 
       const W = 1080, H = 1350;
@@ -1893,28 +1934,50 @@ const Player = (() => {
       x.font = '80px Bungee, sans-serif'; x.fillText('👑', W / 2, cy + 16);
 
       // rest of top 5
-      const TS = 190, gap = 26, row = others.length * TS + (others.length - 1) * gap;
+      const TS = 190, gap = 26, row = others.length * TS + Math.max(0, others.length - 1) * gap;
       let tx = W / 2 - row / 2, ty = cy + CS + 60;
-      x.fillStyle = '#B7A8E0'; x.font = '800 26px Outfit, sans-serif';
-      x.fillText('· the runners-up ·', W / 2, ty - 14);
-      thumbs.forEach(img => {
-        x.save(); rr(tx, ty, TS, TS, 18); x.clip(); x.drawImage(img, tx, ty, TS, TS); x.restore();
-        rr(tx, ty, TS, TS, 18); x.strokeStyle = '#3FE0C5'; x.lineWidth = 4; x.stroke();
-        tx += TS + gap;
-      });
+      if (thumbs.length) {
+        x.fillStyle = '#B7A8E0'; x.font = '800 26px Outfit, sans-serif';
+        x.fillText('· the runners-up ·', W / 2, ty - 14);
+        thumbs.forEach(img => {
+          x.save(); rr(tx, ty, TS, TS, 18); x.clip(); x.drawImage(img, tx, ty, TS, TS); x.restore();
+          rr(tx, ty, TS, TS, 18); x.strokeStyle = '#3FE0C5'; x.lineWidth = 4; x.stroke();
+          tx += TS + gap;
+        });
+      }
 
       x.fillStyle = '#6E5CA8'; x.font = '700 24px Outfit, sans-serif';
       x.fillText('10 rounds · 40 faces · 1 heart', W / 2, H - 44);
 
-      c.toBlob(blob => {
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = `heartthrob-${me.name.toLowerCase().replace(/[^a-z0-9]/g, '')}.png`;
-        document.body.appendChild(a); a.click(); a.remove();
-        setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-        toast('Card saved 📸 — send it to the group chat');
+      c.toBlob(async blob => {
+        if (!blob) return toast("Couldn't export the card.");
+        const fname = `heartthrob-${(me.name || 'me').toLowerCase().replace(/[^a-z0-9]/g, '') || 'me'}.png`;
+        // best path on phones: native share sheet
+        if (navigator.canShare) {
+          try {
+            const file = new File([blob], fname, { type: 'image/png' });
+            if (navigator.canShare({ files: [file] })) {
+              await navigator.share({ files: [file], title: 'HEARTTHROB' });
+              toast('Shared 📸');
+              return;
+            }
+          } catch (e) { if (e && e.name === 'AbortError') return; /* else fall through */ }
+        }
+        showRecapModal(URL.createObjectURL(blob), fname);
       }, 'image/png');
-    } catch (e) { console.error(e); toast("Couldn't build the card — photo didn't load."); }
+    } catch (e) { console.error(e); toast("Couldn't build the card — a photo failed to load."); }
+  }
+
+  function showRecapModal(url, fname) {
+    const m = el('div', 'recap-modal', `
+      <img src="${url}" alt="Your recap card">
+      <p>Long-press the image to save it, or:</p>
+      <div class="row">
+        <a class="btn teal" href="${url}" download="${fname}">⬇ Download</a>
+        <button class="btn ghost" id="recapClose">Close</button>
+      </div>`);
+    document.body.appendChild(m);
+    m.querySelector('#recapClose').onclick = () => { m.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); };
   }
 
   return { resume };
