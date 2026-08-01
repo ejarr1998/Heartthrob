@@ -536,6 +536,7 @@ input[type=text]::placeholder{color:#6E5CA8;font-weight:600}
     <div class="tv-top">
       <div class="tv-logo">HEART♥THROB</div>
       <div style="display:flex;align-items:center;gap:12px">
+        <button class="snd-btn" id="resetBtn" title="Reset game">🔄</button>
         <button class="snd-btn" id="sndBtn" title="Sound on/off">🔊</button>
         <div class="roomcode-pill"><span class="tag">Room</span><b id="tvCode">----</b></div>
       </div>
@@ -1125,6 +1126,12 @@ const TV = (() => {
     const sb = $('#sndBtn');
     sb.textContent = SFX.isMuted() ? '🔇' : '🔊';
     sb.onclick = () => { sb.textContent = SFX.toggleMute() ? '🔇' : '🔊'; };
+    $('#resetBtn').onclick = async () => {
+      if (!confirm('Reset the game? This kicks all players and starts a fresh room with a new code.')) return;
+      await db.ref('rooms/' + code).remove();
+      sessionStorage.removeItem('ht_tv');
+      location.reload();
+    };
     db.ref('rooms/' + code).on('value', s => { room = s.val(); if (room) render(); });
   }
 
@@ -1556,7 +1563,7 @@ const TV = (() => {
       <div class="showcase-grid">${cards}</div>
       <div class="tv-sub" style="margin-top:24px"><button class="btn ghost" id="againBtn">🔁 New game</button></div>`;
     if (match) setTimeout(() => SFX.play('win'), 600);
-    $('#againBtn').onclick = () => { sessionStorage.removeItem('ht_tv'); location.reload(); };
+    $('#againBtn').onclick = async () => { await db.ref('rooms/' + code).remove(); sessionStorage.removeItem('ht_tv'); location.reload(); };
   }
 
   return { init };
