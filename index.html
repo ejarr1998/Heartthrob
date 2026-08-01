@@ -339,12 +339,13 @@ input[type=text]::placeholder{color:#6E5CA8;font-weight:600}
 .rounds-toolbar select{background:var(--ink3);color:var(--cream);border:1px solid var(--line);border-radius:12px;
   padding:9px 12px;font-weight:700;font-family:inherit;font-size:14px;max-width:200px}
 .btn.danger-ghost{color:#FF8AA0;border-color:rgba(255,92,122,.4)}
-.vt-row{display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)}
+.vt-row{display:flex;align-items:center;flex-wrap:wrap;gap:10px 12px;padding:10px 0;border-bottom:1px solid var(--line)}
 .vt-row:last-child{border-bottom:none}
 .vt-row .pav{width:44px;height:44px}
-.vt-row b{flex:1;font-weight:800}
-.vt-btn{background:var(--ink3);border:2px solid var(--line);border-radius:999px;padding:7px 16px;
-  font-weight:800;font-size:13px;color:var(--muted);cursor:pointer;font-family:inherit}
+.vt-row>b{flex:1;min-width:120px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vt-btns{display:flex;gap:8px;flex-wrap:wrap}
+.vt-btn{background:var(--ink3);border:2px solid var(--line);border-radius:999px;padding:8px 14px;
+  font-weight:800;font-size:13px;color:var(--muted);cursor:pointer;font-family:inherit;white-space:nowrap}
 .vt-btn.on{border-color:var(--teal);color:var(--teal);background:rgba(63,224,197,.08)}
 .readiness .pill{background:var(--ink2);border:1px solid var(--line);border-radius:999px;padding:10px 22px;
   font-weight:800;box-shadow:var(--shadow)}
@@ -1057,7 +1058,7 @@ const Studio = (() => {
       Object.entries(players).sort((a, b) => (a[1].order || 0) - (b[1].order || 0)).forEach(([ppid, p]) => {
         const row = el('div', 'vt-row',
           `<div class="pav"><img src="${p.avatar}" alt=""></div><b>${esc(p.name)}</b>` +
-          VPACKS.map(([v, label]) => `<button class="vt-btn${(p.vpack || '') === v ? ' on' : ''}" data-v="${v}">${label}</button>`).join(''));
+          `<div class="vt-btns">` + VPACKS.map(([v, label]) => `<button class="vt-btn${(p.vpack || '') === v ? ' on' : ''}" data-v="${v}">${label}</button>`).join('') + `</div>`);
         row.querySelectorAll('.vt-btn').forEach(btn => btn.onclick = () => {
           const v = btn.dataset.v;
           if (v) db.ref(`rooms/${code}/players/${ppid}/vpack`).set(v);
