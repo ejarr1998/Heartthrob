@@ -1,0 +1,1410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>HEARTTHROB</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#191036;
+  --ink2:#241849;
+  --ink3:#2E1F5C;
+  --line:#3B2A72;
+  --cream:#FFF4E6;
+  --muted:#B7A8E0;
+  --rose:#FF5C7A;
+  --rose-deep:#D93058;
+  --gold:#FFC24B;
+  --gold-deep:#D89A1E;
+  --teal:#3FE0C5;
+  --teal-deep:#1FA98F;
+  --shadow:0 10px 30px rgba(0,0,0,.35);
+  --r:18px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  font-family:'Outfit',sans-serif;
+  background:
+    radial-gradient(1200px 700px at 50% -10%, #33206B 0%, transparent 60%),
+    radial-gradient(900px 600px at 90% 110%, #2A1A57 0%, transparent 55%),
+    var(--ink);
+  color:var(--cream);
+  min-height:100%;
+  overflow-x:hidden;
+}
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;opacity:.05;
+  background-image:repeating-linear-gradient(-45deg, var(--cream) 0 2px, transparent 2px 26px);
+}
+.view{display:none;min-height:100vh}
+.view.on{display:block}
+h1,h2,h3,.display{font-family:'Bungee',cursive;font-weight:400;letter-spacing:.02em}
+button{font-family:'Outfit',sans-serif;cursor:pointer;border:none}
+img{display:block}
+
+/* ---------- chunky game-show buttons ---------- */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  font-weight:800;font-size:17px;color:#fff;
+  background:var(--rose);border-radius:14px;
+  padding:14px 26px;
+  box-shadow:0 5px 0 var(--rose-deep), 0 10px 22px rgba(0,0,0,.35);
+  transition:transform .08s ease, box-shadow .08s ease, filter .15s;
+  user-select:none;
+}
+.btn:active{transform:translateY(4px);box-shadow:0 1px 0 var(--rose-deep), 0 4px 10px rgba(0,0,0,.3)}
+.btn:disabled{filter:grayscale(.7) brightness(.7);pointer-events:none}
+.btn.teal{background:var(--teal);color:#0B3A32;box-shadow:0 5px 0 var(--teal-deep), 0 10px 22px rgba(0,0,0,.35)}
+.btn.teal:active{box-shadow:0 1px 0 var(--teal-deep), 0 4px 10px rgba(0,0,0,.3)}
+.btn.gold{background:var(--gold);color:#4A3405;box-shadow:0 5px 0 var(--gold-deep), 0 10px 22px rgba(0,0,0,.35)}
+.btn.gold:active{box-shadow:0 1px 0 var(--gold-deep)}
+.btn.ghost{background:var(--ink3);box-shadow:0 5px 0 #1B123E, 0 10px 22px rgba(0,0,0,.3);color:var(--cream)}
+.btn.ghost:active{box-shadow:0 1px 0 #1B123E}
+.btn.big{font-size:21px;padding:18px 34px;border-radius:18px}
+.btn.small{font-size:14px;padding:9px 16px;border-radius:11px;box-shadow:0 3px 0 var(--rose-deep)}
+.btn.small.ghost{box-shadow:0 3px 0 #1B123E}
+.btn.small:active{transform:translateY(2px)}
+
+.card{background:var(--ink2);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+.tag{display:inline-block;font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+input[type=text]{
+  font-family:'Outfit';font-weight:700;font-size:18px;color:var(--cream);
+  background:var(--ink);border:2px solid var(--line);border-radius:12px;
+  padding:13px 16px;width:100%;outline:none;transition:border-color .15s;
+}
+input[type=text]:focus{border-color:var(--rose)}
+input[type=text]::placeholder{color:#6E5CA8;font-weight:600}
+
+/* ---------- landing ---------- */
+#landing{display:none;align-items:center;justify-content:center;padding:24px;text-align:center}
+#landing.on{display:flex}
+.logo{font-family:'Bungee';font-size:clamp(40px,9vw,84px);line-height:1;margin-bottom:6px;
+  background:linear-gradient(180deg,#FFD9E1 0%, var(--rose) 55%, var(--rose-deep) 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 6px 0 rgba(0,0,0,.35));
+}
+.logo .heart{color:var(--rose);-webkit-text-fill-color:var(--rose);display:inline-block;animation:beat 1.6s ease-in-out infinite}
+@keyframes beat{0%,100%{transform:scale(1)}12%{transform:scale(1.18)}24%{transform:scale(1)}}
+.subtitle{color:var(--muted);font-weight:700;letter-spacing:.24em;text-transform:uppercase;font-size:13px;margin-bottom:38px}
+.landing-actions{display:flex;flex-direction:column;gap:16px;width:min(340px,90vw);margin:0 auto}
+.host-link{margin-top:34px;color:#7A67B8;font-weight:700;font-size:13px;text-decoration:none;letter-spacing:.06em}
+.host-link:hover{color:var(--muted)}
+
+/* ---------- generic centered panel ---------- */
+.panel-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.panel{width:min(430px,94vw);padding:30px 26px;text-align:center}
+.panel h2{font-size:24px;margin-bottom:18px}
+.field{margin-bottom:16px;text-align:left}
+.field label{display:block;font-size:12px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:7px}
+
+/* ---------- avatar picker ---------- */
+.avatar-pick{display:flex;align-items:center;gap:16px}
+.avatar-preview{width:74px;height:74px;border-radius:50%;background:var(--ink3);border:3px dashed var(--line);
+  display:flex;align-items:center;justify-content:center;font-size:28px;overflow:hidden;flex:none}
+.avatar-preview img{width:100%;height:100%;object-fit:cover}
+.avatar-preview.set{border-style:solid;border-color:var(--rose)}
+
+/* ---------- TV screen ---------- */
+#tvView .tv-shell{min-height:100vh;display:flex;flex-direction:column;padding:26px 34px}
+.tv-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.tv-logo{font-family:'Bungee';font-size:26px;color:var(--rose);filter:drop-shadow(0 3px 0 rgba(0,0,0,.4))}
+.roomcode-pill{display:flex;align-items:center;gap:10px;background:var(--ink2);border:1px solid var(--line);
+  border-radius:999px;padding:8px 18px}
+.roomcode-pill .tag{font-size:11px}
+.roomcode-pill b{font-family:'Bungee';font-size:22px;color:var(--gold);letter-spacing:.1em}
+.tv-stage{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative}
+.tv-caption{font-family:'Bungee';font-size:clamp(20px,3vw,34px);text-align:center;margin-bottom:18px}
+.tv-caption .accent{color:var(--rose)}
+.tv-sub{color:var(--muted);font-weight:700;text-align:center;font-size:16px;margin-top:14px;min-height:22px}
+
+/* lobby players */
+.lobby-grid{display:flex;flex-wrap:wrap;gap:22px;justify-content:center;max-width:900px;margin:10px 0 26px}
+.lobby-player{display:flex;flex-direction:column;align-items:center;gap:10px;animation:popIn .45s cubic-bezier(.2,1.6,.4,1) both}
+.lobby-player .pav{width:96px;height:96px;border-radius:50%;overflow:hidden;border:4px solid var(--rose);box-shadow:var(--shadow)}
+.lobby-player .pav img{width:100%;height:100%;object-fit:cover}
+.lobby-player span{font-weight:800;font-size:17px}
+@keyframes popIn{from{transform:scale(0) rotate(-8deg);opacity:0}to{transform:scale(1) rotate(0);opacity:1}}
+.empty-slots{color:#6E5CA8;font-weight:700}
+
+/* 2x2 photo grid */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px;width:min(78vh,760px);max-width:92vw}
+.gphoto{position:relative;aspect-ratio:1/1;border-radius:20px;overflow:hidden;background:var(--ink3);
+  border:3px solid var(--line);box-shadow:var(--shadow);animation:cardIn .5s cubic-bezier(.2,1.4,.4,1) both}
+.gphoto:nth-child(2){animation-delay:.08s}.gphoto:nth-child(3){animation-delay:.16s}.gphoto:nth-child(4){animation-delay:.24s}
+@keyframes cardIn{from{transform:translateY(26px) scale(.92);opacity:0}to{transform:none;opacity:1}}
+.gphoto img{width:100%;height:100%;object-fit:cover}
+.gphoto .corner{position:absolute;top:10px;left:10px;font-family:'Bungee';font-size:18px;color:#fff;
+  background:rgba(20,10,45,.72);backdrop-filter:blur(4px);border-radius:10px;padding:4px 11px}
+.gphoto.won1{border-color:var(--gold);box-shadow:0 0 0 3px rgba(255,194,75,.35), 0 0 34px rgba(255,194,75,.4), var(--shadow)}
+
+/* reveal chips (signature stamp) */
+.chips{position:absolute;left:8px;right:8px;bottom:8px;display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.chip{position:relative;width:56px;height:56px;border-radius:50%;border:3px solid var(--cream);overflow:visible;
+  box-shadow:0 6px 14px rgba(0,0,0,.5);background:var(--ink3)}
+.chip img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+.chip .rk{position:absolute;top:-9px;right:-9px;width:26px;height:26px;border-radius:50%;
+  background:var(--ink);color:#fff;border:2px solid var(--cream);
+  font-family:'Bungee';font-size:13px;display:flex;align-items:center;justify-content:center}
+.chip.stamp{animation:stamp .55s cubic-bezier(.25,1.5,.35,1) both}
+@keyframes stamp{
+  0%{transform:scale(2.6) rotate(-14deg);opacity:0}
+  55%{transform:scale(.92) rotate(3deg);opacity:1}
+  75%{transform:scale(1.06) rotate(-1deg)}
+  100%{transform:scale(1) rotate(0)}
+}
+.chip.gold1{width:66px;height:66px;border-color:var(--gold)}
+.chip.gold1 .rk{background:var(--gold);color:#4A3405;border-color:#fff}
+.rank-banner{position:absolute;top:-4px;left:50%;transform:translateX(-50%) translateY(-110%);
+  font-family:'Bungee';font-size:clamp(18px,2.4vw,28px);white-space:nowrap;color:var(--muted)}
+.rank-banner.gold{color:var(--gold)}
+
+/* battle (faceoff / final) */
+.battle-wrap{display:flex;align-items:center;gap:28px}
+.bphoto{position:relative;width:min(38vh,380px);max-width:40vw;aspect-ratio:1/1;border-radius:22px;overflow:hidden;
+  border:4px solid var(--line);box-shadow:var(--shadow);transition:transform .35s, border-color .35s, filter .45s, box-shadow .35s}
+.bphoto img{width:100%;height:100%;object-fit:cover}
+.bphoto.winner{border-color:var(--gold);transform:scale(1.06);
+  box-shadow:0 0 0 4px rgba(255,194,75,.3), 0 0 44px rgba(255,194,75,.45), var(--shadow)}
+.bphoto.loser{filter:grayscale(1) brightness(.42);transform:scale(.92)}
+.vs-badge{font-family:'Bungee';font-size:clamp(28px,4vw,46px);color:var(--rose);
+  filter:drop-shadow(0 4px 0 rgba(0,0,0,.45));animation:vsPulse 1.2s ease-in-out infinite}
+@keyframes vsPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}
+.turn-strip{display:flex;align-items:center;gap:12px;margin-bottom:20px;background:var(--ink2);
+  border:1px solid var(--line);border-radius:999px;padding:8px 20px 8px 8px}
+.turn-strip .pav{width:44px;height:44px;border-radius:50%;overflow:hidden;border:3px solid var(--rose)}
+.turn-strip .pav img{width:100%;height:100%;object-fit:cover}
+.turn-strip b{font-size:18px}
+.turn-strip .tag{margin-left:6px}
+
+/* Call It results on TV */
+.predict-row{display:flex;gap:14px;justify-content:center;margin-top:22px;min-height:64px}
+.pred{display:flex;flex-direction:column;align-items:center;gap:5px;animation:popIn .4s cubic-bezier(.2,1.6,.4,1) both}
+.pred .pav{width:52px;height:52px;border-radius:50%;overflow:hidden;border:3px solid var(--line);position:relative}
+.pred .pav img{width:100%;height:100%;object-fit:cover}
+.pred .mark{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-size:24px;font-weight:800;border-radius:50%}
+.pred.right .pav{border-color:var(--teal)}
+.pred.right .mark{background:rgba(31,169,143,.55);color:#EAFFFB}
+.pred.wrong .pav{border-color:#8A4A5F}
+.pred.wrong .mark{background:rgba(120,30,55,.55);color:#FFD9E1}
+.pred span{font-size:12px;font-weight:800;color:var(--muted)}
+.pred.thinking .pav{border-color:var(--teal);animation:think 1s ease-in-out infinite}
+@keyframes think{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+
+/* turn intro splash */
+.splash{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px}
+.splash .pav{width:150px;height:150px;border-radius:50%;overflow:hidden;border:6px solid var(--rose);
+  box-shadow:0 0 60px rgba(255,92,122,.45), var(--shadow);animation:popIn .5s cubic-bezier(.2,1.6,.4,1) both}
+.splash .pav img{width:100%;height:100%;object-fit:cover}
+.splash h2{font-size:clamp(28px,4.5vw,48px);animation:slideUp .5s .1s cubic-bezier(.2,1.4,.4,1) both}
+.splash p{color:var(--muted);font-weight:700;font-size:18px;animation:slideUp .5s .2s cubic-bezier(.2,1.4,.4,1) both}
+@keyframes slideUp{from{transform:translateY(24px);opacity:0}to{transform:none;opacity:1}}
+
+/* showcase */
+.showcase-grid{display:flex;flex-wrap:wrap;gap:26px;justify-content:center;max-width:1100px}
+.show-card{width:220px;padding:16px;text-align:center;animation:popIn .5s cubic-bezier(.2,1.5,.4,1) both}
+.show-card:nth-child(2){animation-delay:.12s}.show-card:nth-child(3){animation-delay:.24s}
+.show-card:nth-child(4){animation-delay:.36s}.show-card:nth-child(5){animation-delay:.48s}.show-card:nth-child(6){animation-delay:.6s}
+.show-card .final-photo{width:100%;aspect-ratio:1/1;border-radius:16px;overflow:hidden;border:3px solid var(--gold);
+  box-shadow:0 0 26px rgba(255,194,75,.3);margin-bottom:12px}
+.show-card .final-photo img{width:100%;height:100%;object-fit:cover}
+.show-card .who{display:flex;align-items:center;justify-content:center;gap:9px}
+.show-card .who .pav{width:34px;height:34px;border-radius:50%;overflow:hidden;border:2px solid var(--rose)}
+.show-card .who .pav img{width:100%;height:100%;object-fit:cover}
+.show-card .who b{font-size:16px}
+.crown{font-size:26px;margin-bottom:4px}
+
+/* ---------- phone: rank grid ---------- */
+.phone-shell{min-height:100vh;display:flex;flex-direction:column;padding:18px;max-width:520px;margin:0 auto}
+.phone-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.me-pill{display:flex;align-items:center;gap:9px;background:var(--ink2);border:1px solid var(--line);border-radius:999px;padding:5px 14px 5px 5px}
+.me-pill .pav{width:32px;height:32px;border-radius:50%;overflow:hidden;border:2px solid var(--rose)}
+.me-pill .pav img{width:100%;height:100%;object-fit:cover}
+.me-pill b{font-size:14px}
+.phone-title{font-family:'Bungee';font-size:20px;text-align:center;margin-bottom:4px}
+.phone-sub{color:var(--muted);font-weight:700;text-align:center;font-size:14px;margin-bottom:16px}
+
+.rank-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;touch-action:none;user-select:none;-webkit-user-select:none}
+.rank-slot{position:relative;aspect-ratio:1/1;border-radius:18px;background:var(--ink3);border:2px dashed var(--line);transition:border-color .15s, background .15s}
+.rank-slot.hover{border-color:var(--teal);background:#2B3A5C}
+.rank-slot .slot-label{position:absolute;top:8px;left:8px;z-index:3;width:34px;height:34px;border-radius:11px;
+  font-family:'Bungee';font-size:17px;display:flex;align-items:center;justify-content:center;
+  background:var(--rose);color:#fff;box-shadow:0 3px 0 var(--rose-deep);pointer-events:none}
+.rank-slot[data-slot="0"] .slot-label{background:var(--gold);color:#4A3405;box-shadow:0 3px 0 var(--gold-deep)}
+.rank-tile{position:absolute;inset:0;border-radius:16px;overflow:hidden;cursor:grab;transition:transform .18s}
+.rank-tile img{width:100%;height:100%;object-fit:cover;pointer-events:none}
+.rank-tile.hidden-src{opacity:.18}
+.rank-tile.swapped{animation:snapIn .3s cubic-bezier(.2,1.5,.4,1)}
+@keyframes snapIn{from{transform:scale(.86)}to{transform:scale(1)}}
+.drag-ghost{position:fixed;z-index:99;width:120px;height:120px;border-radius:16px;overflow:hidden;pointer-events:none;
+  box-shadow:0 18px 40px rgba(0,0,0,.55);transform:translate(-50%,-50%) scale(1.05) rotate(3deg);border:3px solid var(--teal)}
+.drag-ghost img{width:100%;height:100%;object-fit:cover}
+
+/* phone battle pick */
+.pick-col{display:flex;flex-direction:column;gap:14px}
+.pick-photo{position:relative;border-radius:18px;overflow:hidden;border:3px solid var(--line);cursor:pointer;
+  transition:transform .12s, border-color .12s;aspect-ratio:16/10}
+.pick-photo img{width:100%;height:100%;object-fit:cover}
+.pick-photo:active{transform:scale(.97)}
+.pick-photo.teal-mode{border-color:var(--teal)}
+.pick-photo.chosen{border-color:var(--gold);box-shadow:0 0 0 3px rgba(255,194,75,.35)}
+.or-divider{text-align:center;font-family:'Bungee';color:var(--rose);font-size:18px}
+
+.big-emoji{font-size:62px;text-align:center;margin:26px 0 10px;animation:beat 1.8s ease-in-out infinite}
+.status-card{padding:26px 22px;text-align:center;margin-top:12px}
+.status-card h3{font-size:19px;margin-bottom:8px}
+.status-card p{color:var(--muted);font-weight:600;font-size:15px}
+.mini-photo{width:110px;height:110px;border-radius:14px;overflow:hidden;border:3px solid var(--gold);margin:14px auto 0}
+.mini-photo img{width:100%;height:100%;object-fit:cover}
+
+/* top10 modal on phone */
+.t10-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:14px}
+.t10-grid .t10{position:relative;aspect-ratio:1/1;border-radius:12px;overflow:hidden;border:2px solid var(--line)}
+.t10-grid .t10 img{width:100%;height:100%;object-fit:cover}
+.t10-grid .t10.is-final{border-color:var(--gold)}
+.t10-grid .t10 .fbadge{position:absolute;top:6px;right:6px;background:var(--gold);color:#4A3405;
+  font-family:'Bungee';font-size:11px;border-radius:8px;padding:3px 7px}
+
+/* ---------- host studio ---------- */
+#hostView{padding:26px clamp(16px,4vw,44px) 80px}
+.studio-head{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:22px}
+.studio-head h1{font-size:clamp(22px,3.5vw,32px);color:var(--rose)}
+.studio-section{margin-bottom:36px}
+.studio-section>h2{font-size:19px;margin-bottom:5px}
+.studio-section>p.hint{color:var(--muted);font-weight:600;font-size:14px;margin-bottom:16px}
+.lib-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:12px}
+.lib-item{position:relative;aspect-ratio:1/1;border-radius:14px;overflow:hidden;border:2px solid var(--line);background:var(--ink3)}
+.lib-item img{width:100%;height:100%;object-fit:cover}
+.lib-item .lib-actions{position:absolute;inset:auto 0 0 0;display:flex;background:linear-gradient(transparent,rgba(10,5,25,.9));
+  opacity:0;transition:opacity .15s;padding:22px 6px 6px;gap:6px;justify-content:center}
+.lib-item:hover .lib-actions,.lib-item:focus-within .lib-actions{opacity:1}
+.lib-item .used-tag{position:absolute;top:6px;left:6px;background:rgba(63,224,197,.9);color:#0B3A32;
+  font-size:10px;font-weight:800;border-radius:7px;padding:2px 7px;letter-spacing:.05em}
+.lib-item .used-tag.multi{background:var(--gold);color:#4A3405}
+.icon-btn{background:var(--ink2);border:1px solid var(--line);color:var(--cream);border-radius:9px;
+  padding:5px 10px;font-size:12px;font-weight:800}
+.icon-btn:hover{border-color:var(--rose)}
+.icon-btn.danger:hover{border-color:#FF6B6B;color:#FF9B9B}
+.upload-drop{border:2px dashed var(--line);border-radius:16px;padding:30px;text-align:center;color:var(--muted);
+  font-weight:700;cursor:pointer;transition:border-color .15s;margin-bottom:16px}
+.upload-drop:hover,.upload-drop.dragover{border-color:var(--rose);color:var(--cream)}
+
+.rounds-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px}
+.round-card{padding:14px}
+.round-card h3{font-size:15px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
+.round-card h3 .ok{color:var(--teal);font-size:12px;font-family:'Outfit';font-weight:800}
+.round-card h3 .no{color:var(--muted);font-size:12px;font-family:'Outfit';font-weight:800}
+.round-slots{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.rslot{position:relative;aspect-ratio:1/1;border-radius:11px;border:2px dashed var(--line);background:var(--ink3);
+  overflow:hidden;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#6E5CA8;font-size:22px;font-weight:700}
+.rslot:hover{border-color:var(--rose)}
+.rslot img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.rslot .rslot-x{position:absolute;top:4px;right:4px;z-index:2;width:22px;height:22px;border-radius:50%;
+  background:rgba(10,5,25,.8);color:#fff;font-size:12px;font-weight:800;display:none;align-items:center;justify-content:center}
+.rslot:hover .rslot-x{display:flex}
+.readiness{position:sticky;bottom:14px;margin-top:26px;display:flex;justify-content:center}
+.readiness .pill{background:var(--ink2);border:1px solid var(--line);border-radius:999px;padding:10px 22px;
+  font-weight:800;box-shadow:var(--shadow)}
+.readiness .pill.ready{border-color:var(--teal);color:var(--teal)}
+
+/* ---------- modals ---------- */
+.modal{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;
+  background:rgba(10,5,25,.78);backdrop-filter:blur(6px);padding:18px}
+.modal.on{display:flex}
+.modal-box{width:min(440px,96vw);max-height:92vh;overflow:auto;padding:22px}
+.modal-box h3{font-size:18px;margin-bottom:14px}
+.crop-stage{position:relative;width:min(340px,80vw);aspect-ratio:1/1;margin:0 auto 14px;border-radius:16px;
+  overflow:hidden;background:#0D0722;touch-action:none;cursor:grab;border:2px solid var(--line)}
+.crop-stage canvas{width:100%;height:100%;display:block}
+.crop-stage::after{content:"";position:absolute;inset:0;pointer-events:none;border:2px solid rgba(255,255,255,.35);border-radius:16px;
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.3)}
+.zoom-row{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.zoom-row input[type=range]{flex:1;accent-color:var(--rose)}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end}
+.picker-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:8px}
+.picker-grid .pk{position:relative;aspect-ratio:1/1;border-radius:11px;overflow:hidden;border:2px solid var(--line);cursor:pointer}
+.picker-grid .pk:hover{border-color:var(--rose)}
+.picker-grid .pk img{width:100%;height:100%;object-fit:cover}
+.picker-grid .pk .used-dot{position:absolute;top:4px;right:4px;width:10px;height:10px;border-radius:50%;background:var(--teal)}
+
+/* toast + confetti + waiting dots */
+#toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(80px);z-index:80;
+  background:var(--ink2);border:1px solid var(--line);border-radius:12px;padding:12px 20px;font-weight:800;
+  box-shadow:var(--shadow);transition:transform .3s cubic-bezier(.2,1.4,.4,1);max-width:90vw;text-align:center}
+#toast.on{transform:translateX(-50%) translateY(0)}
+.confetti{position:fixed;top:-14px;z-index:70;width:10px;height:14px;border-radius:3px;pointer-events:none;
+  animation:fall linear forwards}
+@keyframes fall{to{transform:translateY(110vh) rotate(720deg);opacity:.9}}
+.dots::after{content:"";animation:dots 1.4s steps(4) infinite}
+@keyframes dots{0%{content:""}25%{content:"."}50%{content:".."}75%{content:"..."}}
+.waiting-avatars{display:flex;gap:8px;justify-content:center;margin-top:12px}
+.waiting-avatars .wa{width:38px;height:38px;border-radius:50%;overflow:hidden;border:3px solid var(--line);transition:border-color .2s;opacity:.45}
+.waiting-avatars .wa img{width:100%;height:100%;object-fit:cover}
+.waiting-avatars .wa.done{border-color:var(--teal);opacity:1}
+
+/* config missing */
+#configGate{position:fixed;inset:0;z-index:200;background:var(--ink);display:none;align-items:center;justify-content:center;padding:24px}
+#configGate.on{display:flex}
+#configGate .panel{text-align:left}
+#configGate code{background:var(--ink3);border-radius:6px;padding:2px 7px;font-size:13px;color:var(--gold)}
+#configGate ol{margin:12px 0 0 20px;color:var(--muted);font-weight:600;line-height:1.7;font-size:14px}
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.001s !important;transition-duration:.001s !important}
+}
+@media (max-width:720px){
+  .battle-wrap{flex-direction:column;gap:12px}
+  .bphoto{max-width:74vw;width:min(34vh,340px)}
+  #tvView .tv-shell{padding:18px}
+}
+</style>
+</head>
+<body>
+
+<!-- ============ CONFIG GATE ============ -->
+<div id="configGate">
+  <div class="panel card">
+    <h2 style="color:var(--rose);margin-bottom:10px">One-time setup</h2>
+    <p style="color:var(--muted);font-weight:600;font-size:14px">This app needs your Firebase project config. Open <code>index.html</code> and paste it into <code>FIREBASE_CONFIG</code> at the top of the script.</p>
+    <ol>
+      <li>Firebase Console → Project settings → Your apps → Web app</li>
+      <li>Copy the <code>firebaseConfig</code> object</li>
+      <li>Enable <b>Realtime Database</b> and <b>Storage</b></li>
+      <li>Apply the rules from README.md</li>
+    </ol>
+  </div>
+</div>
+
+<!-- ============ LANDING ============ -->
+<div id="landing" class="view">
+  <div>
+    <div class="logo">HEART<span class="heart">♥</span>THROB</div>
+    <div class="subtitle">Find your type · party game</div>
+    <div class="landing-actions">
+      <button class="btn big" id="goJoin">📱 Join on this phone</button>
+      <button class="btn big ghost" id="goTv">📺 Host on this screen (TV)</button>
+    </div>
+    <a class="host-link" href="#studio">🎬 Photo Studio (game setup)</a>
+  </div>
+</div>
+
+<!-- ============ JOIN (PHONE) ============ -->
+<div id="joinView" class="view">
+  <div class="panel-wrap">
+    <div class="panel card">
+      <h2 style="color:var(--rose)">Join the game</h2>
+      <div class="field">
+        <label>Room code</label>
+        <input type="text" id="joinCode" maxlength="4" placeholder="ABCD" autocomplete="off" style="text-transform:uppercase;letter-spacing:.35em;text-align:center;font-family:'Bungee';font-size:24px">
+      </div>
+      <div class="field">
+        <label>Your name</label>
+        <input type="text" id="joinName" maxlength="14" placeholder="e.g. Tyler" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>Your face</label>
+        <div class="avatar-pick">
+          <div class="avatar-preview" id="avatarPreview">📷</div>
+          <button class="btn small teal" id="avatarBtn">Take / choose selfie</button>
+          <input type="file" id="avatarInput" accept="image/*" capture="user" hidden>
+        </div>
+      </div>
+      <button class="btn big" id="joinBtn" style="width:100%;margin-top:6px">Let's go →</button>
+      <p id="joinErr" style="color:#FF9B9B;font-weight:700;font-size:14px;margin-top:12px;min-height:18px"></p>
+    </div>
+  </div>
+</div>
+
+<!-- ============ PLAYER (PHONE) ============ -->
+<div id="playView" class="view">
+  <div class="phone-shell">
+    <div class="phone-top">
+      <div class="me-pill"><div class="pav"><img id="meAvatar" alt=""></div><b id="meName"></b></div>
+      <div class="roomcode-pill" style="padding:5px 14px"><b id="meRoom" style="font-size:15px"></b></div>
+    </div>
+    <div id="playStage" style="flex:1;display:flex;flex-direction:column"></div>
+  </div>
+</div>
+
+<!-- ============ TV ============ -->
+<div id="tvView" class="view">
+  <div class="tv-shell">
+    <div class="tv-top">
+      <div class="tv-logo">HEART♥THROB</div>
+      <div class="roomcode-pill"><span class="tag">Room</span><b id="tvCode">----</b></div>
+    </div>
+    <div class="tv-stage" id="tvStage"></div>
+  </div>
+</div>
+
+<!-- ============ HOST STUDIO ============ -->
+<div id="hostView" class="view">
+  <div class="studio-head">
+    <h1>🎬 Photo Studio</h1>
+    <a class="host-link" href="#" style="margin:0">← Back to game</a>
+  </div>
+
+  <div class="studio-section card" style="padding:20px">
+    <h2>Photo library</h2>
+    <p class="hint">Upload your AI-generated photos. Each one gets cropped to a square — drag to center, pinch or slide to zoom. Deleting a photo removes it from Storage and from any round it was assigned to.</p>
+    <div class="upload-drop" id="uploadDrop">➕ Tap to upload photos (or drop them here)</div>
+    <input type="file" id="uploadInput" accept="image/*" multiple hidden>
+    <div class="lib-grid" id="libGrid"></div>
+  </div>
+
+  <div class="studio-section card" style="padding:20px">
+    <h2>Rounds</h2>
+    <p class="hint">Hand-pick 4 photos for each of the 10 rounds. Tap an empty slot to choose from your library. A photo can technically repeat across rounds, but it'll be flagged so you notice.</p>
+    <div class="rounds-grid" id="roundsGrid"></div>
+    <div class="readiness"><div class="pill" id="readyPill">Checking…</div></div>
+  </div>
+</div>
+
+<!-- ============ MODALS ============ -->
+<div class="modal" id="cropModal">
+  <div class="modal-box card">
+    <h3>✂️ Crop & center</h3>
+    <div class="crop-stage" id="cropStage"><canvas id="cropCanvas" width="680" height="680"></canvas></div>
+    <div class="zoom-row"><span>🔍</span><input type="range" id="cropZoom" min="0" max="100" value="0"></div>
+    <div class="modal-actions">
+      <button class="btn small ghost" id="cropCancel">Cancel</button>
+      <button class="btn small" id="cropSave">Save photo</button>
+    </div>
+    <p id="cropQueueNote" style="color:var(--muted);font-weight:700;font-size:13px;margin-top:12px;text-align:center"></p>
+  </div>
+</div>
+
+<div class="modal" id="pickerModal">
+  <div class="modal-box card">
+    <h3>Choose a photo</h3>
+    <div class="picker-grid" id="pickerGrid"></div>
+    <div class="modal-actions" style="margin-top:14px">
+      <button class="btn small ghost" id="pickerCancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="top10Modal">
+  <div class="modal-box card">
+    <h3>💘 Your Top 10</h3>
+    <div class="t10-grid" id="t10Grid"></div>
+    <div class="modal-actions" style="margin-top:14px">
+      <button class="btn small" id="top10Close">Close</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+<script>
+/* ================================================================
+   HEARTTHROB — party game
+   1) Paste your Firebase web config below.
+   2) Enable Realtime Database + Storage in the Firebase console.
+   3) Apply the security rules from README.md.
+================================================================ */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCtUFArqekHVrD7K2nJHSObqtwJ4e5JkHs",
+  authDomain: "heartthrob-95fc4.firebaseapp.com",
+  databaseURL: "https://heartthrob-95fc4-default-rtdb.firebaseio.com",
+  projectId: "heartthrob-95fc4",
+  storageBucket: "heartthrob-95fc4.firebasestorage.app",
+  messagingSenderId: "486578588114",
+  appId: "1:486578588114:web:e2bdbcd996df47d3cc600b"
+};
+
+/* ---------------- boot ---------------- */
+const configured = FIREBASE_CONFIG.apiKey !== "PASTE_YOUR_CONFIG";
+if (!configured) document.getElementById('configGate').classList.add('on');
+let db = null, store = null;
+if (configured) {
+  firebase.initializeApp(FIREBASE_CONFIG);
+  db = firebase.database();
+  store = firebase.storage();
+}
+
+/* ---------------- utils ---------------- */
+const $ = s => document.querySelector(s);
+const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const shuffle = arr => { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function toast(msg, ms = 2600) { const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('on'), ms); }
+function confettiBurst(n = 90) {
+  const colors = ['#FF5C7A', '#FFC24B', '#3FE0C5', '#FFF4E6', '#B7A8E0'];
+  for (let i = 0; i < n; i++) {
+    const c = el('div', 'confetti');
+    c.style.left = Math.random() * 100 + 'vw';
+    c.style.background = colors[i % colors.length];
+    c.style.animationDuration = (2.2 + Math.random() * 2.4) + 's';
+    c.style.animationDelay = (Math.random() * .8) + 's';
+    c.style.transform = `rotate(${Math.random() * 360}deg)`;
+    document.body.appendChild(c);
+    setTimeout(() => c.remove(), 6200);
+  }
+}
+const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ';
+const makeCode = () => Array.from({length: 4}, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
+const RANK_WORDS = { 4: 'FOURTH PICK', 3: 'THIRD PICK', 2: 'RUNNER-UP', 1: 'NUMBER ONE' };
+
+/* ---------------- router ---------------- */
+const views = ['landing', 'joinView', 'playView', 'tvView', 'hostView'];
+function show(id) { views.forEach(v => $('#' + v).classList.toggle('on', v === id)); window.scrollTo(0, 0); }
+function route() {
+  if (!configured) return;
+  const h = location.hash;
+  if (h === '#studio') { show('hostView'); Studio.init(); }
+  else if (h === '#tv') { show('tvView'); TV.init(); }
+  else if (h === '#join') { show('joinView'); }
+  else {
+    const saved = JSON.parse(localStorage.getItem('ht_player') || 'null');
+    if (saved && saved.code && saved.pid) { Player.resume(saved); } else show('landing');
+  }
+}
+window.addEventListener('hashchange', route);
+$('#goJoin').onclick = () => location.hash = '#join';
+$('#goTv').onclick = () => location.hash = '#tv';
+
+/* ---------------- image helpers ---------------- */
+function fileToImage(file) {
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => res({ img, url });
+    img.onerror = rej;
+    img.src = url;
+  });
+}
+function urlToImage(src) {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => res(img);
+    img.onerror = rej;
+    img.src = src;
+  });
+}
+function squareDataURL(img, size, quality) {
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  const ctx = c.getContext('2d');
+  const m = Math.min(img.naturalWidth, img.naturalHeight);
+  ctx.drawImage(img, (img.naturalWidth - m) / 2, (img.naturalHeight - m) / 2, m, m, 0, 0, size, size);
+  return c.toDataURL('image/jpeg', quality);
+}
+
+/* ================================================================
+   CROP TOOL  (square crop, drag to pan, slider/pinch to zoom)
+================================================================ */
+const Crop = (() => {
+  const modal = $('#cropModal'), stage = $('#cropStage'), canvas = $('#cropCanvas'), ctx = canvas.getContext('2d'), zoomEl = $('#cropZoom');
+  let img = null, scale = 1, minScale = 1, maxScale = 4, tx = 0, ty = 0, resolveFn = null;
+  let pointers = new Map(), lastDist = 0;
+
+  function clamp() {
+    const w = img.naturalWidth * scale, h = img.naturalHeight * scale, S = canvas.width;
+    tx = Math.min(0, Math.max(S - w, tx));
+    ty = Math.min(0, Math.max(S - h, ty));
+  }
+  function draw() {
+    ctx.fillStyle = '#0D0722'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, tx, ty, img.naturalWidth * scale, img.naturalHeight * scale);
+  }
+  function setScaleAround(newScale, cx, cy) {
+    newScale = Math.min(maxScale, Math.max(minScale, newScale));
+    tx = cx - (cx - tx) * (newScale / scale);
+    ty = cy - (cy - ty) * (newScale / scale);
+    scale = newScale; clamp(); draw();
+  }
+  const stagePt = e => {
+    const r = stage.getBoundingClientRect();
+    return { x: (e.clientX - r.left) / r.width * canvas.width, y: (e.clientY - r.top) / r.height * canvas.height };
+  };
+  stage.addEventListener('pointerdown', e => { stage.setPointerCapture(e.pointerId); pointers.set(e.pointerId, stagePt(e)); lastDist = 0; });
+  stage.addEventListener('pointermove', e => {
+    if (!pointers.has(e.pointerId) || !img) return;
+    const p = stagePt(e);
+    if (pointers.size === 1) {
+      const prev = pointers.get(e.pointerId);
+      tx += p.x - prev.x; ty += p.y - prev.y; clamp(); draw();
+    } else if (pointers.size === 2) {
+      pointers.set(e.pointerId, p);
+      const [a, b] = [...pointers.values()];
+      const dist = Math.hypot(a.x - b.x, a.y - b.y);
+      if (lastDist) setScaleAround(scale * (dist / lastDist), (a.x + b.x) / 2, (a.y + b.y) / 2);
+      lastDist = dist;
+      zoomEl.value = (scale - minScale) / (maxScale - minScale) * 100;
+      return;
+    }
+    pointers.set(e.pointerId, p);
+  });
+  const up = e => { pointers.delete(e.pointerId); lastDist = 0; };
+  stage.addEventListener('pointerup', up); stage.addEventListener('pointercancel', up);
+  zoomEl.addEventListener('input', () => {
+    const s = minScale + (zoomEl.value / 100) * (maxScale - minScale);
+    setScaleAround(s, canvas.width / 2, canvas.height / 2);
+  });
+  $('#cropCancel').onclick = () => { modal.classList.remove('on'); resolveFn && resolveFn(null); };
+  $('#cropSave').onclick = () => {
+    const out = document.createElement('canvas'); out.width = out.height = 640;
+    const octx = out.getContext('2d');
+    const k = 640 / canvas.width;
+    octx.fillStyle = '#0D0722'; octx.fillRect(0, 0, 640, 640);
+    octx.drawImage(img, tx * k, ty * k, img.naturalWidth * scale * k, img.naturalHeight * scale * k);
+    modal.classList.remove('on');
+    out.toBlob(b => resolveFn && resolveFn(b), 'image/jpeg', .88);
+  };
+
+  return {
+    open(image, note) {
+      return new Promise(res => {
+        resolveFn = res; img = image;
+        minScale = Math.max(canvas.width / img.naturalWidth, canvas.height / img.naturalHeight);
+        maxScale = minScale * 4;
+        scale = minScale;
+        tx = (canvas.width - img.naturalWidth * scale) / 2;
+        ty = (canvas.height - img.naturalHeight * scale) / 2;
+        zoomEl.value = 0;
+        $('#cropQueueNote').textContent = note || '';
+        modal.classList.add('on'); draw();
+      });
+    }
+  };
+})();
+
+/* ================================================================
+   HOST STUDIO — library upload/edit/delete + round assignment
+================================================================ */
+const Studio = (() => {
+  let library = {}, rounds = {}, booted = false;
+  const NUM_ROUNDS = 10, SLOTS = 4;
+
+  function init() {
+    if (booted) return; booted = true;
+    db.ref('library').on('value', s => { library = s.val() || {}; renderLib(); renderRounds(); });
+    db.ref('rounds').on('value', s => { rounds = s.val() || {}; renderLib(); renderRounds(); });
+    const drop = $('#uploadDrop'), input = $('#uploadInput');
+    drop.onclick = () => input.click();
+    drop.ondragover = e => { e.preventDefault(); drop.classList.add('dragover'); };
+    drop.ondragleave = () => drop.classList.remove('dragover');
+    drop.ondrop = e => { e.preventDefault(); drop.classList.remove('dragover'); handleFiles([...e.dataTransfer.files]); };
+    input.onchange = () => { handleFiles([...input.files]); input.value = ''; };
+    $('#pickerCancel').onclick = () => $('#pickerModal').classList.remove('on');
+  }
+
+  async function handleFiles(files) {
+    files = files.filter(f => f.type.startsWith('image/'));
+    for (let i = 0; i < files.length; i++) {
+      const { img, url } = await fileToImage(files[i]);
+      const blob = await Crop.open(img, files.length > 1 ? `Photo ${i + 1} of ${files.length}` : '');
+      URL.revokeObjectURL(url);
+      if (!blob) continue;
+      await uploadPhoto(files[i], blob);
+    }
+  }
+
+  async function uploadPhoto(origFile, croppedBlob) {
+    const id = db.ref('library').push().key;
+    toast('Uploading…', 8000);
+    try {
+      const cropRef = store.ref(`photos/${id}.jpg`);
+      const origRef = store.ref(`originals/${id}`);
+      await cropRef.put(croppedBlob, { contentType: 'image/jpeg' });
+      await origRef.put(origFile, { contentType: origFile.type });
+      const [url, origUrl] = await Promise.all([cropRef.getDownloadURL(), origRef.getDownloadURL()]);
+      await db.ref('library/' + id).set({ url, origUrl, path: `photos/${id}.jpg`, origPath: `originals/${id}`, ts: Date.now() });
+      toast('Photo added ✓');
+    } catch (e) { console.error(e); toast('Upload failed — check Firebase rules'); }
+  }
+
+  async function recrop(id) {
+    const item = library[id]; if (!item) return;
+    toast('Loading original…');
+    try {
+      const img = await urlToImage(item.origUrl || item.url);
+      const blob = await Crop.open(img, 'Re-cropping');
+      if (!blob) return;
+      const cropRef = store.ref(item.path);
+      await cropRef.put(blob, { contentType: 'image/jpeg' });
+      const url = await cropRef.getDownloadURL();
+      await db.ref('library/' + id + '/url').set(url);
+      toast('Crop updated ✓');
+    } catch (e) { console.error(e); toast('Re-crop failed'); }
+  }
+
+  async function removePhoto(id) {
+    const item = library[id]; if (!item) return;
+    if (!confirm('Delete this photo? It will be removed from Storage and from any rounds using it.')) return;
+    try {
+      const updates = {};
+      Object.entries(rounds).forEach(([r, slots]) => {
+        Object.entries(slots || {}).forEach(([s, pid]) => { if (pid === id) updates[`rounds/${r}/${s}`] = null; });
+      });
+      updates['library/' + id] = null;
+      await db.ref().update(updates);
+      await store.ref(item.path).delete().catch(() => {});
+      if (item.origPath) await store.ref(item.origPath).delete().catch(() => {});
+      toast('Photo deleted ✓');
+    } catch (e) { console.error(e); toast('Delete failed'); }
+  }
+
+  function usage(id) {
+    let n = 0;
+    Object.values(rounds).forEach(slots => Object.values(slots || {}).forEach(pid => { if (pid === id) n++; }));
+    return n;
+  }
+
+  function renderLib() {
+    const g = $('#libGrid'); g.innerHTML = '';
+    const items = Object.entries(library).sort((a, b) => a[1].ts - b[1].ts);
+    if (!items.length) { g.appendChild(el('p', null, '<span style="color:#6E5CA8;font-weight:700">No photos yet — upload some above.</span>')); return; }
+    items.forEach(([id, it]) => {
+      const d = el('div', 'lib-item');
+      d.innerHTML = `<img src="${it.url}" alt="">`;
+      const n = usage(id);
+      if (n) d.appendChild(el('span', 'used-tag' + (n > 1 ? ' multi' : ''), n > 1 ? `used ×${n}` : 'used'));
+      const acts = el('div', 'lib-actions');
+      const rc = el('button', 'icon-btn', '✂️ Crop'); rc.onclick = () => recrop(id);
+      const dl = el('button', 'icon-btn danger', '🗑'); dl.onclick = () => removePhoto(id);
+      acts.append(rc, dl); d.appendChild(acts); g.appendChild(d);
+    });
+  }
+
+  function renderRounds() {
+    const g = $('#roundsGrid'); g.innerHTML = '';
+    let complete = 0;
+    for (let r = 0; r < NUM_ROUNDS; r++) {
+      const slots = rounds[r] || {};
+      const filled = [0, 1, 2, 3].filter(s => slots[s] && library[slots[s]]).length;
+      if (filled === SLOTS) complete++;
+      const card = el('div', 'round-card card');
+      card.innerHTML = `<h3>Round ${r + 1} ${filled === SLOTS ? '<span class="ok">✓ ready</span>' : `<span class="no">${filled}/4</span>`}</h3>`;
+      const sg = el('div', 'round-slots');
+      for (let s = 0; s < SLOTS; s++) {
+        const pid = slots[s], it = pid && library[pid];
+        const slot = el('div', 'rslot', it ? `<img src="${it.url}" alt="">` : '+');
+        if (it) {
+          const x = el('div', 'rslot-x', '✕');
+          x.onclick = e => { e.stopPropagation(); db.ref(`rounds/${r}/${s}`).remove(); };
+          slot.appendChild(x);
+        }
+        slot.onclick = () => openPicker(r, s);
+        sg.appendChild(slot);
+      }
+      card.appendChild(sg); g.appendChild(card);
+    }
+    const pill = $('#readyPill');
+    pill.textContent = complete === NUM_ROUNDS ? '🎉 All 10 rounds ready — game on!' : `${complete}/10 rounds ready`;
+    pill.classList.toggle('ready', complete === NUM_ROUNDS);
+  }
+
+  function openPicker(r, s) {
+    const modal = $('#pickerModal'), g = $('#pickerGrid'); g.innerHTML = '';
+    const items = Object.entries(library).sort((a, b) => a[1].ts - b[1].ts);
+    if (!items.length) { toast('Upload photos to the library first'); return; }
+    items.forEach(([id, it]) => {
+      const d = el('div', 'pk', `<img src="${it.url}" alt="">`);
+      if (usage(id)) d.appendChild(el('span', 'used-dot'));
+      d.onclick = () => { db.ref(`rounds/${r}/${s}`).set(id); modal.classList.remove('on'); };
+      g.appendChild(d);
+    });
+    modal.classList.add('on');
+  }
+
+  return { init };
+})();
+</script>
+<script>
+/* ================================================================
+   TV — game master, drives all state transitions
+================================================================ */
+const TV = (() => {
+  let code = null, room = null, booted = false;
+  const done = new Set();                     // one-shot guards
+  const stage = () => $('#tvStage');
+
+  async function init() {
+    if (booted) return; booted = true;
+    const saved = sessionStorage.getItem('ht_tv');
+    if (saved) {
+      const snap = await db.ref('rooms/' + saved).once('value');
+      if (snap.exists()) { code = saved; listen(); return; }
+    }
+    await createRoom();
+  }
+
+  async function createRoom() {
+    stage().innerHTML = '<div class="tv-caption">Setting the stage<span class="dots"></span></div>';
+    const [libS, rndS] = await Promise.all([db.ref('library').once('value'), db.ref('rounds').once('value')]);
+    const lib = libS.val() || {}, rnd = rndS.val() || {};
+    const roundsArr = [];
+    for (let r = 0; r < 10; r++) {
+      const row = [];
+      for (let s = 0; s < 4; s++) {
+        const id = rnd[r] && rnd[r][s], it = id && lib[id];
+        if (!it) {
+          stage().innerHTML = `<div class="tv-caption">Rounds aren't ready</div>
+            <div class="tv-sub">Round ${r + 1} is missing photos. Set up all 10 rounds in the Photo Studio, then reload.</div>
+            <a class="btn gold" style="margin-top:22px" href="#studio">Open Photo Studio</a>`;
+          return;
+        }
+        row.push(it.url);
+      }
+      roundsArr.push(row);
+    }
+    code = makeCode();
+    await db.ref('rooms/' + code).set({
+      createdAt: firebase.database.ServerValue.TIMESTAMP,
+      state: 'lobby', phase: 'rounds', round: 0, rounds: roundsArr
+    });
+    sessionStorage.setItem('ht_tv', code);
+    listen();
+  }
+
+  function listen() {
+    $('#tvCode').textContent = code;
+    db.ref('rooms/' + code).on('value', s => { room = s.val(); if (room) render(); });
+  }
+
+  const R = () => db.ref('rooms/' + code);
+  const players = () => Object.entries(room.players || {}).sort((a, b) => a[1].order - b[1].order);
+  const once = key => { if (done.has(key)) return false; done.add(key); return true; };
+
+  function pav(av, cls) { return `<div class="pav ${cls || ''}"><img src="${av}" alt=""></div>`; }
+
+  /* ---------- render dispatcher ---------- */
+  function render() {
+    const st = room.state;
+    if (st === 'lobby') renderLobby();
+    else if (st === 'vote') renderVote();
+    else if (st === 'reveal') { if (once('reveal:' + room.round)) playReveal(); }
+    else if (st === 'turnIntro') renderIntro();
+    else if (st === 'battle') renderBattle();
+    else if (st === 'battleReveal') renderBattleReveal();
+    else if (st === 'showcase') { if (once('showcase')) renderShowcase(); }
+  }
+
+  /* ---------- lobby ---------- */
+  function renderLobby() {
+    const ps = players();
+    const s = stage();
+    s.innerHTML = `
+      <div class="tv-caption">Who's playing<span class="accent">?</span></div>
+      <div class="tv-sub" style="margin:0 0 8px">Open <b style="color:var(--cream)">${esc(location.origin + location.pathname)}</b> on your phone → room code <b style="color:var(--gold);font-family:'Bungee'">${code}</b></div>
+      <div class="lobby-grid" id="lobbyGrid"></div>
+      <button class="btn big gold" id="startBtn" ${ps.length < 2 ? 'disabled' : ''}>Start the show ▶</button>
+      <div class="tv-sub">${ps.length < 2 ? 'Need at least 2 players' : ps.length > 6 ? 'Max 6 players!' : ps.length + ' player' + (ps.length > 1 ? 's' : '') + ' ready'}</div>`;
+    const g = s.querySelector('#lobbyGrid');
+    if (!ps.length) g.innerHTML = '<div class="empty-slots">Waiting for the first brave soul<span class="dots"></span></div>';
+    ps.forEach(([pid, p]) => {
+      const d = el('div', 'lobby-player', `${pav(p.avatar)}<span>${esc(p.name)}</span>`);
+      g.appendChild(d);
+    });
+    const btn = s.querySelector('#startBtn');
+    if (ps.length > 6) btn.disabled = true;
+    btn.onclick = () => R().update({ state: 'vote' });
+  }
+
+  /* ---------- voting round ---------- */
+  let voteScreenRound = -1;
+  function renderVote() {
+    const r = room.round, ps = players();
+    const votes = (room.votes && room.votes[r]) || {};
+    if (voteScreenRound !== r || !$('#tvGrid')) {
+      voteScreenRound = r;
+      stage().innerHTML = `
+        <div class="tv-caption">Round <span class="accent">${r + 1}</span> of 10</div>
+        <div class="grid2" id="tvGrid"></div>
+        <div class="tv-sub">Rank them 1–4 on your phones!</div>
+        <div class="waiting-avatars" id="waitRow"></div>`;
+      const g = $('#tvGrid');
+      'ABCD'.split('').forEach((L, i) => {
+        g.appendChild(el('div', 'gphoto', `<img src="${room.rounds[r][i]}" alt=""><span class="corner">${L}</span><div class="chips"></div>`));
+      });
+    }
+    const w = $('#waitRow'); w.innerHTML = '';
+    ps.forEach(([pid, p]) => w.appendChild(el('div', 'wa' + (votes[pid] ? ' done' : ''), `<img src="${p.avatar}" alt="">`)));
+    // all in?
+    if (ps.length && ps.every(([pid]) => votes[pid]) && once('procvote:' + r)) {
+      const updates = {};
+      ps.forEach(([pid]) => { updates[`top10/${pid}/${r}`] = room.rounds[r][votes[pid][0]]; });
+      updates['state'] = 'reveal';
+      R().update(updates);
+    }
+  }
+
+  /* ---------- staggered reveal (the signature stamp) ---------- */
+  async function playReveal() {
+    const r = room.round, ps = players(), votes = room.votes[r];
+    stage().innerHTML = `
+      <div class="tv-caption">The verdict<span class="accent">!</span></div>
+      <div style="position:relative">
+        <div class="rank-banner" id="rankBanner"></div>
+        <div class="grid2" id="tvGrid"></div>
+      </div>
+      <div class="tv-sub" id="revealSub"></div>`;
+    const g = $('#tvGrid');
+    'ABCD'.split('').forEach((L, i) => {
+      g.appendChild(el('div', 'gphoto', `<img src="${room.rounds[r][i]}" alt=""><span class="corner">${L}</span><div class="chips"></div>`));
+    });
+    await sleep(900);
+    const banner = $('#rankBanner');
+    for (let rank = 4; rank >= 1; rank--) {
+      banner.className = 'rank-banner' + (rank === 1 ? ' gold' : '');
+      banner.style.animation = 'none'; void banner.offsetWidth;
+      banner.style.animation = 'popIn .4s cubic-bezier(.2,1.6,.4,1) both';
+      banner.textContent = RANK_WORDS[rank];
+      await sleep(650);
+      for (const [pid, p] of ps) {
+        if (!votes[pid]) continue;
+        const idx = votes[pid][rank - 1];
+        const chip = el('div', 'chip stamp' + (rank === 1 ? ' gold1' : ''),
+          `<img src="${p.avatar}" alt=""><span class="rk">${rank}</span>`);
+        g.children[idx].querySelector('.chips').appendChild(chip);
+        await sleep(380);
+      }
+      await sleep(rank === 1 ? 500 : 850);
+    }
+    // glow every photo that took a #1
+    new Set(ps.filter(([pid]) => votes[pid]).map(([pid]) => votes[pid][0])).forEach(i => g.children[i].classList.add('won1'));
+    confettiBurst(36);
+    const sub = $('#revealSub');
+    const next = el('button', 'btn gold', room.round < 9 ? `Round ${room.round + 2} ▶` : 'To the faceoffs! ⚔️');
+    next.onclick = () => {
+      if (room.round < 9) R().update({ round: room.round + 1, state: 'vote' });
+      else startFaceoffPhase();
+    };
+    sub.innerHTML = ''; sub.appendChild(next);
+  }
+
+  /* ---------- faceoff / final orchestration ---------- */
+  function startFaceoffPhase() {
+    const order = shuffle(players().map(([pid]) => pid));
+    const updates = { phase: 'faceoff', turnOrder: order, turnIdx: 0, state: 'turnIntro' };
+    Object.assign(updates, buildFaceoff(order[0]));
+    R().update(updates);
+  }
+  function buildFaceoff(pid) {
+    const ten = Object.values(room.top10[pid] || {});
+    let pairs = null;
+    for (let t = 0; t < 30; t++) {
+      const a = shuffle(ten);
+      const p = [[a[0], a[1]], [a[2], a[3]], [a[4], a[5]], [a[6], a[7]], [a[8], a[9]]];
+      if (p.every(x => x[0] !== x[1])) { pairs = p; break; }
+      pairs = p;
+    }
+    return { battle: { kind: 'faceoff', pid, a: pairs[0][0], b: pairs[0][1], queue: pairs.slice(1), winners: [], num: 1, total: 5, pick: null, predictions: null } };
+  }
+  function buildFinal(pid) {
+    const pool = shuffle(Object.values(room.top5[pid] || {}));
+    return { battle: { kind: 'final', pid, a: pool[0], b: pool[1], pool: pool.slice(2), num: 1, total: 4, pick: null, predictions: null } };
+  }
+
+  function renderIntro() {
+    const pid = room.turnOrder[room.turnIdx], p = room.players[pid];
+    const isFinal = room.phase === 'final';
+    stage().innerHTML = `<div class="splash">
+      ${pav(p.avatar)}
+      <h2>${esc(p.name)}'s ${isFinal ? '<span style="color:var(--gold)">Final Gauntlet</span>' : '<span style="color:var(--rose)">Top 10 Faceoff</span>'}</h2>
+      <p>${isFinal ? 'Five photos. One heart. Last one standing wins.' : 'Their 10 first-place picks battle down to a Top 5.'}</p>
+      <p style="color:var(--teal)">📱 Everyone else: get ready to <b>Call It!</b></p>
+    </div>`;
+    const key = `intro:${room.phase}:${room.turnIdx}`;
+    if (once(key)) setTimeout(() => R().update({ state: 'battle' }), 3600);
+  }
+
+  function battleShell(extra) {
+    const b = room.battle, p = room.players[b.pid];
+    const isFinal = b.kind === 'final';
+    stage().innerHTML = `
+      <div class="turn-strip">${pav(p.avatar)}<b>${esc(p.name)}</b>
+        <span class="tag">${isFinal ? 'Final' : 'Faceoff'} · Battle ${b.num} of ${b.total}</span></div>
+      <div class="battle-wrap">
+        <div class="bphoto" id="bpA"><img src="${b.a}" alt=""></div>
+        <div class="vs-badge">${isFinal ? '👑' : 'VS'}</div>
+        <div class="bphoto" id="bpB"><img src="${b.b}" alt=""></div>
+      </div>
+      <div class="predict-row" id="predRow"></div>
+      <div class="tv-sub" id="battleSub">${extra || ''}</div>`;
+  }
+
+  let battleScreenKey = '';
+  function renderBattle() {
+    const b = room.battle, preds = b.predictions || {};
+    const bk = `battle:${room.phase}:${room.turnIdx}:${b.num}`;
+    if (battleScreenKey !== bk || !$('#predRow')) {
+      battleScreenKey = bk;
+      battleShell(`${esc(room.players[b.pid].name)} is choosing<span class="dots"></span>`);
+    }
+    const row = $('#predRow'); row.innerHTML = '';
+    players().forEach(([pid, p]) => {
+      if (pid === b.pid) return;
+      const locked = preds[pid] != null;
+      row.appendChild(el('div', 'pred' + (locked ? '' : ' thinking'),
+        `<div class="pav" ${locked ? 'style="border-color:var(--teal)"' : ''}><img src="${p.avatar}" alt=""></div><span>${locked ? 'locked in' : 'calling it…'}</span>`));
+    });
+    // active player picked → reveal
+    if (b.pick != null && once(`pick:${room.phase}:${room.turnIdx}:${b.num}`)) {
+      R().update({ state: 'battleReveal' });
+    }
+  }
+
+  function renderBattleReveal() {
+    const b = room.battle, preds = b.predictions || {};
+    battleScreenKey = '';
+    battleShell('');
+    $('#bpA').classList.add(b.pick === 0 ? 'winner' : 'loser');
+    $('#bpB').classList.add(b.pick === 1 ? 'winner' : 'loser');
+    const row = $('#predRow');
+    players().forEach(([pid, p]) => {
+      if (pid === b.pid) return;
+      const guess = preds[pid];
+      const state = guess == null ? 'wrong' : (guess === b.pick ? 'right' : 'wrong');
+      const mark = guess == null ? '–' : (guess === b.pick ? '✓' : '✗');
+      row.appendChild(el('div', 'pred ' + state,
+        `<div class="pav"><img src="${p.avatar}" alt=""><div class="mark">${mark}</div></div><span>${guess == null ? 'no call' : (guess === b.pick ? 'called it!' : 'missed')}</span>`));
+    });
+    $('#battleSub').textContent = b.kind === 'final' && !(b.pool || []).length ? '' : 'She lives to fight another round…';
+    if (once(`adv:${room.phase}:${room.turnIdx}:${b.num}`)) setTimeout(advanceBattle, 3000);
+  }
+
+  function advanceBattle() {
+    const b = room.battle;
+    const winner = b.pick === 0 ? b.a : b.b;
+    const u = {};
+    let finishedTurn = false, finishedTop5 = null;
+    if (b.kind === 'faceoff') {
+      const winners = [...(b.winners || []), winner];
+      const queue = b.queue || [];
+      if (queue.length) {
+        u.state = 'battle';
+        u.battle = { ...b, a: queue[0][0], b: queue[0][1], queue: queue.slice(1), winners, num: b.num + 1, pick: null, predictions: null };
+      } else { u[`top5/${b.pid}`] = winners; finishedTop5 = winners; finishedTurn = true; }
+    } else {
+      const pool = b.pool || [];
+      if (pool.length) {
+        u.state = 'battle';
+        u.battle = { ...b, a: winner, b: pool[0], pool: pool.slice(1), num: b.num + 1, pick: null, predictions: null };
+      } else { u[`finalPick/${b.pid}`] = winner; finishedTurn = true; }
+    }
+    if (finishedTurn) {
+      const idx = room.turnIdx + 1, order = room.turnOrder;
+      if (idx < order.length) {
+        u.turnIdx = idx; u.state = 'turnIntro';
+        Object.assign(u, room.phase === 'faceoff' ? buildFaceoff(order[idx]) : buildFinal(order[idx]));
+      } else if (room.phase === 'faceoff') {
+        u.phase = 'final'; u.turnIdx = 0; u.state = 'turnIntro';
+        // the finishing player's top5 isn't in `room` yet — pass it through if they're first up
+        const firstTop5 = order[0] === b.pid ? finishedTop5 : Object.values(room.top5?.[order[0]] || {});
+        const pool = shuffle(firstTop5);
+        u.battle = { kind: 'final', pid: order[0], a: pool[0], b: pool[1], pool: pool.slice(2), num: 1, total: 4, pick: null, predictions: null };
+      } else {
+        u.state = 'showcase'; u.battle = null;
+      }
+    }
+    R().update(u);
+  }
+
+  /* ---------- finale ---------- */
+  function renderShowcase() {
+    confettiBurst(140);
+    const cards = room.turnOrder.map(pid => {
+      const p = room.players[pid];
+      return `<div class="show-card card">
+        <div class="crown">👑</div>
+        <div class="final-photo"><img src="${room.finalPick[pid]}" alt=""></div>
+        <div class="who">${pav(p.avatar)}<b>${esc(p.name)}</b></div>
+      </div>`;
+    }).join('');
+    stage().innerHTML = `
+      <div class="tv-caption">And their hearts belong to<span class="accent">…</span></div>
+      <div class="showcase-grid">${cards}</div>
+      <div class="tv-sub" style="margin-top:24px"><button class="btn ghost" id="againBtn">🔁 New game</button></div>`;
+    $('#againBtn').onclick = () => { sessionStorage.removeItem('ht_tv'); location.reload(); };
+  }
+
+  return { init };
+})();
+
+/* ================================================================
+   PLAYER (phone)
+================================================================ */
+const Player = (() => {
+  let code = null, pid = null, me = null, room = null, avatarData = null;
+  let lastKey = '', localOrder = [0, 1, 2, 3];
+  const stage = () => $('#playStage');
+
+  /* ---- join screen wiring ---- */
+  $('#avatarBtn').onclick = () => $('#avatarInput').click();
+  $('#avatarInput').onchange = async e => {
+    const f = e.target.files[0]; if (!f) return;
+    const { img, url } = await fileToImage(f);
+    avatarData = squareDataURL(img, 220, .8);
+    URL.revokeObjectURL(url);
+    const pv = $('#avatarPreview'); pv.classList.add('set'); pv.innerHTML = `<img src="${avatarData}" alt="">`;
+  };
+  $('#joinBtn').onclick = async () => {
+    const err = $('#joinErr'); err.textContent = '';
+    const c = $('#joinCode').value.trim().toUpperCase();
+    const name = $('#joinName').value.trim();
+    if (c.length !== 4) return err.textContent = 'Enter the 4-letter room code from the TV.';
+    if (!name) return err.textContent = 'What should we call you?';
+    if (!avatarData) return err.textContent = 'Snap a selfie first — it shows up on the TV!';
+    const snap = await db.ref('rooms/' + c).once('value');
+    if (!snap.exists()) return err.textContent = 'No room with that code. Double-check the TV.';
+    const rm = snap.val();
+    if (rm.state !== 'lobby') return err.textContent = 'That game already started — wait for the next one!';
+    if (Object.keys(rm.players || {}).length >= 6) return err.textContent = 'Room is full (6 max).';
+    code = c;
+    pid = db.ref(`rooms/${c}/players`).push().key;
+    await db.ref(`rooms/${c}/players/${pid}`).set({ name, avatar: avatarData, order: Date.now() });
+    localStorage.setItem('ht_player', JSON.stringify({ code, pid }));
+    enter();
+  };
+
+  async function resume(saved) {
+    const snap = await db.ref(`rooms/${saved.code}/players/${saved.pid}`).once('value');
+    if (!snap.exists()) { localStorage.removeItem('ht_player'); show('landing'); return; }
+    code = saved.code; pid = saved.pid;
+    enter();
+  }
+
+  function enter() {
+    show('playView');
+    db.ref('rooms/' + code).on('value', s => {
+      room = s.val();
+      if (!room || !room.players || !room.players[pid]) {
+        localStorage.removeItem('ht_player'); location.hash = ''; location.reload(); return;
+      }
+      me = room.players[pid];
+      $('#meAvatar').src = me.avatar; $('#meName').textContent = me.name; $('#meRoom').textContent = code;
+      render();
+    });
+    $('#top10Close').onclick = () => $('#top10Modal').classList.remove('on');
+  }
+
+  const R = () => db.ref('rooms/' + code);
+  const myVote = () => room.votes && room.votes[room.round] && room.votes[room.round][pid];
+
+  function render() {
+    const b = room.battle || {};
+    const key = [room.state, room.round, room.phase, room.turnIdx, b.num, b.pick != null, !!myVote(),
+      b.predictions && b.predictions[pid] != null].join('|');
+    if (key === lastKey) return;
+    lastKey = key;
+    const st = room.state;
+    if (st === 'lobby') renderLobby();
+    else if (st === 'vote') renderVote();
+    else if (st === 'reveal') renderWatchTV();
+    else if (st === 'turnIntro') renderIntro();
+    else if (st === 'battle') renderBattle();
+    else if (st === 'battleReveal') renderBattleReveal();
+    else if (st === 'showcase') renderShowcase();
+  }
+
+  function renderLobby() {
+    const n = Object.keys(room.players || {}).length;
+    stage().innerHTML = `<div class="big-emoji">🕺</div>
+      <div class="status-card card"><h3>You're in!</h3>
+      <p>${n} player${n > 1 ? 's' : ''} in the lobby. Waiting for the host to start the show…</p></div>`;
+  }
+
+  /* ---- drag-to-rank voting ---- */
+  function renderVote() {
+    if (myVote()) { renderLocked(); return; }
+    localOrder = [0, 1, 2, 3];
+    stage().innerHTML = `
+      <div class="phone-title">Round ${room.round + 1}</div>
+      <div class="phone-sub">Hold & drag to rank · 1 = your favorite</div>
+      <div class="rank-grid" id="rankGrid"></div>
+      <button class="btn big" id="voteBtn" style="width:100%;margin-top:18px">Lock it in 🔒</button>`;
+    drawRankGrid();
+    $('#voteBtn').onclick = () => {
+      R().child(`votes/${room.round}/${pid}`).set(localOrder);
+    };
+  }
+
+  function drawRankGrid(swapped) {
+    const g = $('#rankGrid'); if (!g) return;
+    g.innerHTML = '';
+    const photos = room.rounds[room.round];
+    localOrder.forEach((photoIdx, slot) => {
+      const slotEl = el('div', 'rank-slot');
+      slotEl.dataset.slot = slot;
+      slotEl.innerHTML = `<span class="slot-label">${slot + 1}</span>`;
+      const tile = el('div', 'rank-tile' + (swapped && swapped.includes(slot) ? ' swapped' : ''), `<img src="${photos[photoIdx]}" alt="" draggable="false">`);
+      tile.dataset.slot = slot;
+      tile.addEventListener('pointerdown', startDrag);
+      slotEl.appendChild(tile);
+      g.appendChild(slotEl);
+    });
+  }
+
+  let drag = null;
+  function startDrag(e) {
+    e.preventDefault();
+    const tile = e.currentTarget;
+    const from = +tile.dataset.slot;
+    const ghost = el('div', 'drag-ghost', tile.innerHTML);
+    document.body.appendChild(ghost);
+    moveGhost(ghost, e.clientX, e.clientY);
+    tile.classList.add('hidden-src');
+    drag = { from, ghost, tile };
+    window.addEventListener('pointermove', onDragMove);
+    window.addEventListener('pointerup', onDragEnd, { once: true });
+  }
+  function moveGhost(g, x, y) { g.style.left = x + 'px'; g.style.top = y + 'px'; }
+  function slotUnder(x, y) {
+    drag.ghost.style.display = 'none';
+    const elUnder = document.elementFromPoint(x, y);
+    drag.ghost.style.display = '';
+    return elUnder && elUnder.closest('.rank-slot');
+  }
+  function onDragMove(e) {
+    if (!drag) return;
+    moveGhost(drag.ghost, e.clientX, e.clientY);
+    document.querySelectorAll('.rank-slot').forEach(s => s.classList.remove('hover'));
+    const s = slotUnder(e.clientX, e.clientY);
+    if (s && +s.dataset.slot !== drag.from) s.classList.add('hover');
+  }
+  function onDragEnd(e) {
+    window.removeEventListener('pointermove', onDragMove);
+    if (!drag) return;
+    const s = slotUnder(e.clientX, e.clientY);
+    drag.ghost.remove();
+    if (s && +s.dataset.slot !== drag.from) {
+      const to = +s.dataset.slot;
+      [localOrder[drag.from], localOrder[to]] = [localOrder[to], localOrder[drag.from]];
+      if (navigator.vibrate) navigator.vibrate(18);
+      drawRankGrid([drag.from, to]);
+    } else {
+      drag.tile.classList.remove('hidden-src');
+      document.querySelectorAll('.rank-slot').forEach(x => x.classList.remove('hover'));
+    }
+    drag = null;
+  }
+
+  function renderLocked() {
+    const v = myVote();
+    stage().innerHTML = `<div class="big-emoji">🔒</div>
+      <div class="status-card card"><h3>Locked in!</h3><p>Waiting for the slowpokes…</p>
+      <div class="mini-photo"><img src="${room.rounds[room.round][v[0]]}" alt=""></div>
+      <p style="margin-top:10px;color:var(--gold);font-weight:800">Your #1 this round</p></div>`;
+  }
+
+  function renderWatchTV() {
+    const v = myVote();
+    stage().innerHTML = `<div class="big-emoji">👀</div>
+      <div class="status-card card"><h3>Eyes on the TV!</h3><p>The verdicts are dropping…</p>
+      ${v ? `<div class="mini-photo"><img src="${room.rounds[room.round][v[0]]}" alt=""></div>
+      <p style="margin-top:10px;color:var(--gold);font-weight:800">Your #1 — saved to your Top 10</p>` : ''}</div>`;
+  }
+
+  function renderIntro() {
+    const activeId = room.turnOrder[room.turnIdx], active = room.players[activeId];
+    const isFinal = room.phase === 'final';
+    if (activeId === pid) {
+      stage().innerHTML = `<div class="big-emoji">😤</div>
+        <div class="status-card card"><h3>You're up${isFinal ? ' — Final Gauntlet!' : '!'}</h3>
+        <p>${isFinal ? 'Your Top 5 enter. Only one leaves.' : 'Your 10 first-place picks are about to face off.'}</p></div>`;
+    } else {
+      stage().innerHTML = `<div class="big-emoji">🔮</div>
+        <div class="status-card card"><h3>${esc(active.name)} is up</h3>
+        <p>Get ready to <b style="color:var(--teal)">Call It</b> — predict which photo they'll pick!</p></div>`;
+    }
+  }
+
+  function renderBattle() {
+    const b = room.battle;
+    const mine = b.pid === pid;
+    const preds = b.predictions || {};
+    if (mine && b.pick != null) {
+      stage().innerHTML = `<div class="big-emoji">💘</div><div class="status-card card"><h3>Pick is in!</h3><p>Watch the TV…</p></div>`;
+    } else if (mine) {
+      stage().innerHTML = `
+        <div class="phone-title">${b.kind === 'final' ? '👑 Final' : '⚔️ Faceoff'} ${b.num}/${b.total}</div>
+        <div class="phone-sub">Tap the one your heart says</div>
+        <div class="pick-col">
+          <div class="pick-photo" data-i="0"><img src="${b.a}" alt=""></div>
+          <div class="or-divider">— or —</div>
+          <div class="pick-photo" data-i="1"><img src="${b.b}" alt=""></div>
+        </div>`;
+      stage().querySelectorAll('.pick-photo').forEach(p => p.onclick = () => {
+        if (room.battle.pick != null) return;
+        p.classList.add('chosen');
+        R().child('battle/pick').set(+p.dataset.i);
+      });
+    } else if (b.pick != null) {
+      stage().innerHTML = `<div class="big-emoji">🥁</div><div class="status-card card"><h3>Pick is in!</h3><p>Check the TV…</p></div>`;
+    } else if (preds[pid] != null) {
+      stage().innerHTML = `<div class="big-emoji">🤞</div>
+        <div class="status-card card"><h3>Call locked in</h3><p>Waiting on ${esc(room.players[b.pid].name)}…</p>
+        <div class="mini-photo" style="border-color:var(--teal)"><img src="${preds[pid] === 0 ? b.a : b.b}" alt=""></div>
+        <p style="margin-top:10px;color:var(--teal);font-weight:800">Your call</p></div>`;
+    } else {
+      stage().innerHTML = `
+        <div class="phone-title" style="color:var(--teal)">🔮 Call It!</div>
+        <div class="phone-sub">Which one will ${esc(room.players[b.pid].name)} pick?</div>
+        <div class="pick-col">
+          <div class="pick-photo teal-mode" data-i="0"><img src="${b.a}" alt=""></div>
+          <div class="or-divider" style="color:var(--teal)">— or —</div>
+          <div class="pick-photo teal-mode" data-i="1"><img src="${b.b}" alt=""></div>
+        </div>`;
+      stage().querySelectorAll('.pick-photo').forEach(p => p.onclick = () => {
+        if (room.battle.pick != null || (room.battle.predictions || {})[pid] != null) return;
+        R().child('battle/predictions/' + pid).set(+p.dataset.i);
+      });
+    }
+  }
+
+  function renderBattleReveal() {
+    const b = room.battle;
+    const winUrl = b.pick === 0 ? b.a : b.b;
+    if (b.pid === pid) {
+      stage().innerHTML = `<div class="big-emoji">💘</div>
+        <div class="status-card card"><h3>Noted.</h3><p>She stays in the running.</p>
+        <div class="mini-photo"><img src="${winUrl}" alt=""></div></div>`;
+    } else {
+      const guess = (b.predictions || {})[pid];
+      const right = guess === b.pick;
+      stage().innerHTML = `<div class="big-emoji">${guess == null ? '😴' : right ? '🎯' : '🙈'}</div>
+        <div class="status-card card">
+        <h3 style="color:${right ? 'var(--teal)' : 'var(--muted)'}">${guess == null ? 'No call made' : right ? 'Called it!' : 'Missed it!'}</h3>
+        <p>${right ? 'You know ' + esc(room.players[b.pid].name) + ' too well.' : 'Watch the TV for the next battle…'}</p></div>`;
+    }
+  }
+
+  function renderShowcase() {
+    const finalUrl = (room.finalPick || {})[pid];
+    stage().innerHTML = `<div class="phone-title" style="color:var(--gold)">👑 Your winner</div>
+      <div class="status-card card" style="padding-top:20px">
+        <div class="mini-photo" style="width:200px;height:200px;margin-top:0"><img src="${finalUrl}" alt=""></div>
+        <p style="margin-top:14px">Out of 40 photos and 10 rounds… this is your type.</p>
+        <button class="btn teal" id="viewT10" style="margin-top:16px">View Top 10</button>
+      </div>`;
+    $('#viewT10').onclick = () => {
+      const g = $('#t10Grid'); g.innerHTML = '';
+      const ten = Object.values(room.top10[pid] || {});
+      const five = new Set(Object.values(room.top5[pid] || {}));
+      ten.forEach(url => {
+        const isF = url === finalUrl;
+        const d = el('div', 't10' + (isF ? ' is-final' : ''), `<img src="${url}" alt="">` + (isF ? '<span class="fbadge">WINNER</span>' : five.has(url) ? '<span class="fbadge" style="background:var(--teal);color:#0B3A32">TOP 5</span>' : ''));
+        g.appendChild(d);
+      });
+      $('#top10Modal').classList.add('on');
+    };
+  }
+
+  return { resume };
+})();
+
+route();
+</script>
+</body>
+</html>
