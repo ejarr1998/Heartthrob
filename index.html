@@ -333,6 +333,13 @@ input[type=text]::placeholder{color:#6E5CA8;font-weight:600}
 .rounds-toolbar select{background:var(--ink3);color:var(--cream);border:1px solid var(--line);border-radius:12px;
   padding:9px 12px;font-weight:700;font-family:inherit;font-size:14px;max-width:200px}
 .btn.danger-ghost{color:#FF8AA0;border-color:rgba(255,92,122,.4)}
+.vt-row{display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)}
+.vt-row:last-child{border-bottom:none}
+.vt-row .pav{width:44px;height:44px}
+.vt-row b{flex:1;font-weight:800}
+.vt-btn{background:var(--ink3);border:2px solid var(--line);border-radius:999px;padding:7px 16px;
+  font-weight:800;font-size:13px;color:var(--muted);cursor:pointer;font-family:inherit}
+.vt-btn.on{border-color:var(--teal);color:var(--teal);background:rgba(63,224,197,.08)}
 .readiness .pill{background:var(--ink2);border:1px solid var(--line);border-radius:999px;padding:10px 22px;
   font-weight:800;box-shadow:var(--shadow)}
 .readiness .pill.ready{border-color:var(--teal);color:var(--teal)}
@@ -663,6 +670,17 @@ input[type=text]::placeholder{color:#6E5CA8;font-weight:600}
     <div class="rounds-grid" id="roundsGrid"></div>
     <div class="readiness"><div class="pill" id="readyPill">Checking…</div></div>
   </div>
+
+  <div class="studio-section card" style="padding:20px">
+    <h2>🎙 Voice tags</h2>
+    <p class="hint">Host-only. Enter the live room code to secretly tag joined players with a custom voice-line pack. Players never see this — tags follow the player no matter what username they picked.</p>
+    <div class="rounds-toolbar" style="margin-bottom:8px">
+      <input type="text" id="vtCode" maxlength="4" placeholder="ROOM" style="background:var(--ink3);color:var(--cream);border:1px solid var(--line);border-radius:12px;padding:9px 12px;font-weight:800;font-family:'Bungee';font-size:16px;letter-spacing:.15em;width:110px;text-transform:uppercase">
+      <button class="btn" id="vtLoad">Load room</button>
+      <span class="hint" id="vtStatus" style="margin:0"></span>
+    </div>
+    <div id="vtList"></div>
+  </div>
 </div>
 
 <!-- ============ MODALS ============ -->
@@ -816,6 +834,54 @@ const SFX = (() => {
   return { play, toggleMute, isMuted: () => muted };
 })();
 
+/* ---------------- announcer voice lines (mp3s in voice/) ---------------- */
+const VOICE = (() => {
+  const cache = {};
+  let current = null, queueTimer = null;
+  function get(name) {
+    if (!cache[name]) {
+      const a = new Audio('voice/' + name + '.mp3');
+      a.preload = 'auto';
+      cache[name] = a;
+    }
+    return cache[name];
+  }
+  function stop() {
+    if (current) { try { current.pause(); current.currentTime = 0; } catch (e) {} current = null; }
+    if (queueTimer) { clearTimeout(queueTimer); queueTimer = null; }
+  }
+  function say(name) {
+    if (SFX.isMuted()) return;
+    stop();
+    const a = get(name);
+    current = a;
+    a.play().catch(() => {});   // missing file or pre-gesture: silently skip
+  }
+  function any(names) { say(names[Math.floor(Math.random() * names.length)]); }
+  // play a sequence, each starting when the previous ends (with a safety fallback)
+  function queue(names, fallbackGap = 2400) {
+    if (SFX.isMuted() || !names.length) return;
+    stop();
+    let i = 0;
+    const next = () => {
+      if (queueTimer) { clearTimeout(queueTimer); queueTimer = null; }
+      if (i >= names.length) { current = null; return; }
+      const a = get(names[i++]);
+      current = a;
+      let advanced = false;
+      const go = () => { if (!advanced) { advanced = true; next(); } };
+      a.onended = go;
+      queueTimer = setTimeout(go, fallbackGap + 1500);
+      a.play().catch(go);
+    };
+    next();
+  }
+  // custom packs — files staged; per-line triggers wired once specified
+  const PACKS = { gabe: ['gabeone', 'gabetwo', 'gabethree', 'gabefour', 'gabefive'],
+                  mark: ['markone', 'marktwo', 'markthree', 'markfour', 'markfive'] };
+  return { say, any, queue, stop, PACKS };
+})();
+
 /* ---------------- router ---------------- */
 const views = ['landing', 'joinView', 'playView', 'tvView', 'hostView'];
 function show(id) { views.forEach(v => $('#' + v).classList.toggle('on', v === id)); window.scrollTo(0, 0); }
@@ -963,6 +1029,36 @@ const Studio = (() => {
     $('#savePresetBtn').onclick = savePreset;
     $('#loadPresetBtn').onclick = loadPreset;
     $('#delPresetBtn').onclick = deletePreset;
+    $('#vtLoad').onclick = vtLoadRoom;
+    $('#vtCode').addEventListener('keydown', e => { if (e.key === 'Enter') vtLoadRoom(); });
+  }
+
+  /* ---- voice tags: secretly assign custom voice packs to live players ---- */
+  const VPACKS = [['', '—'], ['gabe', '🎙 Gabe'], ['mark', '🎙 Mark']];
+  let vtRef = null;
+  function vtLoadRoom() {
+    const code = ($('#vtCode').value || '').trim().toUpperCase();
+    if (code.length !== 4) return toast('Enter the 4-letter room code from the TV.');
+    if (vtRef) vtRef.off();
+    vtRef = db.ref('rooms/' + code + '/players');
+    $('#vtStatus').textContent = 'connecting…';
+    vtRef.on('value', s => {
+      const players = s.val();
+      const list = $('#vtList'); list.innerHTML = '';
+      if (!players) { $('#vtStatus').textContent = `no players in room ${code} (yet)`; return; }
+      $('#vtStatus').textContent = `room ${code} · live`;
+      Object.entries(players).sort((a, b) => (a[1].order || 0) - (b[1].order || 0)).forEach(([ppid, p]) => {
+        const row = el('div', 'vt-row',
+          `<div class="pav"><img src="${p.avatar}" alt=""></div><b>${esc(p.name)}</b>` +
+          VPACKS.map(([v, label]) => `<button class="vt-btn${(p.vpack || '') === v ? ' on' : ''}" data-v="${v}">${label}</button>`).join(''));
+        row.querySelectorAll('.vt-btn').forEach(btn => btn.onclick = () => {
+          const v = btn.dataset.v;
+          if (v) db.ref(`rooms/${code}/players/${ppid}/vpack`).set(v);
+          else db.ref(`rooms/${code}/players/${ppid}/vpack`).remove();
+        });
+        list.appendChild(row);
+      });
+    });
   }
 
   /* ---- randomize: 40 unique photos into the 10 rounds ---- */
@@ -1231,6 +1327,11 @@ const TV = (() => {
 
   function pav(av, cls) { return `<div class="pav ${cls || ''}"><img src="${av}" alt=""></div>`; }
 
+  // custom voice packs: find the player carrying a tag (assigned in #studio → Voice tags)
+  const taggedPid = pack => { const e = players().find(([, p]) => p.vpack === pack); return e ? e[0] : null; };
+  const vpackOf = pid2 => (room.players[pid2] || {}).vpack || null;
+  const sdLosses = {};   // showdown losses per player (for markfive: "3 strikes you out")
+
   function megaSplash(text, rose) {
     const m = el('div', 'mega' + (rose ? ' rose' : ''), `<b>${text}</b>`);
     document.body.appendChild(m);
@@ -1238,9 +1339,41 @@ const TV = (() => {
   }
 
   let hbTimer = null;
+  let idleKey = '', idleTimer = null, idleFires = 0, idleHoldout = null;
+  function armIdle(k, active, holdoutPid) {
+    idleHoldout = holdoutPid || null;
+    if (k !== idleKey) { idleKey = k; idleFires = 0; if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; } }
+    if (!active) { if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; } return; }
+    if (!idleTimer && idleFires < 2) {
+      idleTimer = setTimeout(() => {
+        idleTimer = null; idleFires++;
+        // Gabe stalling gets his personal nags: gabeone first, gabethree second
+        if (idleHoldout && vpackOf(idleHoldout) === 'gabe') VOICE.say(idleFires === 1 ? 'gabeone' : 'gabethree');
+        else VOICE.any(['vo_hurry_1', 'vo_hurry_2']);
+        armIdle(idleKey, true, idleHoldout);
+      }, 45000);
+    }
+  }
   /* ---------- render dispatcher ---------- */
   function render() {
     const st = room.state;
+    // hurry-up nagging: any screen waiting on somebody
+    if (st === 'vote') {
+      const r = room.round, votes = (room.votes && room.votes[r]) || {};
+      const missing = players().filter(([pid]) => !votes[pid]);
+      armIdle('vote:' + r, missing.length > 0, missing.length === 1 ? missing[0][0] : null);
+    } else if (st === 'sdVote') {
+      const d = room.showdown.duel, votes = d.votes || {};
+      const missing = players().filter(([pid]) => pid !== d.a && pid !== d.b && votes[pid] == null);
+      armIdle('sdVote:' + room.showdown.duelIdx + ':' + (d.rematch || 0), missing.length > 0, missing.length === 1 ? missing[0][0] : null);
+    } else if (st === 'sdDuel') {
+      const d = room.showdown.duel, cards = d.cards || {};
+      const missing = [d.a, d.b].filter(p2 => !cards[p2]);
+      armIdle('sdDuel:' + room.showdown.duelIdx + ':' + (d.rematch || 0), missing.length > 0, missing.length === 1 ? missing[0] : null);
+    } else if (st === 'battle') {
+      const b = room.battle;
+      armIdle('battle:' + room.phase + ':' + room.turnIdx + ':' + b.num, b.pick == null, b.pid);
+    } else armIdle('none', false);
     // sudden-death heartbeat: only while a rematch duel is being picked
     const wantHB = st === 'sdDuel' && room.showdown && room.showdown.duel && room.showdown.duel.rematch;
     if (wantHB && !hbTimer) hbTimer = setInterval(() => SFX.play('heart'), 1150);
@@ -1264,7 +1397,12 @@ const TV = (() => {
   let prevPlayerCount = 0;
   function renderLobby() {
     const ps = players();
-    if (ps.length > prevPlayerCount) SFX.play('join');
+    if (once('vo_boot')) VOICE.say('vo_boot');
+    if (taggedPid('mark') && once('vo_marktwo')) setTimeout(() => VOICE.say('marktwo'), 800);
+    if (ps.length > prevPlayerCount) {
+      SFX.play('join');
+      if (ps.length === 6) VOICE.say('vo_lobby_full');
+    }
     prevPlayerCount = ps.length;
     const s = stage();
     s.innerHTML = `
@@ -1289,20 +1427,21 @@ const TV = (() => {
     });
     const btn = s.querySelector('#startBtn');
     if (ps.length > 6) btn.disabled = true;
-    btn.onclick = () => { playStartFx(); R().update({ state: 'vote', mode: 'classic' }); };
+    btn.onclick = () => { playStartFx(Math.random() < .5 ? 'vo_start_1' : 'vo_start_2'); R().update({ state: 'vote', mode: 'classic' }); };
     const sdb = s.querySelector('#sdBtn');
     if (ps.length > 6) sdb.disabled = true;
     sdb.onclick = () => startShowdown();
   }
 
   /* ---------- arrow-through-heart start FX ---------- */
-  function playStartFx() {
+  function playStartFx(voiceLine) {
     const fx = el('div', 'introFx', `
       <div class="fxheart">♥</div>
       <div class="fxarrow"><div class="fletch"></div><div class="shaft"></div><div class="head"></div></div>
       <div class="fxtitle">LET'S FIND YOUR TYPE</div>`);
     document.body.appendChild(fx);
     SFX.play('whoosh');
+    if (voiceLine) setTimeout(() => VOICE.say(voiceLine), 900);
     requestAnimationFrame(() => requestAnimationFrame(() => fx.classList.add('fly')));
     setTimeout(() => {
       fx.classList.add('hit', 'shake');
@@ -1321,6 +1460,7 @@ const TV = (() => {
     const votes = (room.votes && room.votes[r]) || {};
     if (voteScreenRound !== r || !$('#tvGrid')) {
       voteScreenRound = r; prevLockCount = 0;
+      if (once('vo_round:' + r)) VOICE.say(r === 9 ? 'vo_final_round' : ['vo_round_1', 'vo_round_2', 'vo_round_3'][Math.floor(Math.random() * 3)]);
       stage().innerHTML = `
         <div class="tv-split">
           <div class="tv-main"><div class="grid2" id="tvGrid"></div></div>
@@ -1337,6 +1477,7 @@ const TV = (() => {
     }
     const lockCount = ps.filter(([pid]) => votes[pid]).length;
     if (lockCount > prevLockCount) SFX.play('lock');
+    if (lockCount === ps.length && ps.length > 0 && once('vo_locked:' + r)) VOICE.say('vo_votes_locked');
     prevLockCount = lockCount;
     const w = $('#waitRow'); w.innerHTML = '';
     ps.forEach(([pid, p]) => w.appendChild(el('div', 'wa' + (votes[pid] ? ' done' : ''), `<img src="${p.avatar}" alt="">`)));
@@ -1375,6 +1516,7 @@ const TV = (() => {
       banner.style.animation = 'popIn .4s cubic-bezier(.2,1.6,.4,1) both';
       banner.textContent = RANK_WORDS[rank];
       SFX.play('rank', rank);
+      VOICE.say('vo_rank' + rank);
       await sleep(650);
       for (const [pid, p] of ps) {
         if (!votes[pid]) continue;
@@ -1396,6 +1538,7 @@ const TV = (() => {
       await sleep(500);
       megaSplash('UNANIMOUS!');
       SFX.play('fanfare');
+      VOICE.say('vo_unanimous');
       confettiBurst(90);
     }
     const sub = $('#revealSub');
@@ -1440,7 +1583,17 @@ const TV = (() => {
       <p style="color:var(--teal)">📱 Everyone else: get ready to <b>Call It!</b></p>
     </div>`;
     const key = `intro:${room.phase}:${room.turnIdx}`;
-    if (once(key)) { SFX.play('whoosh'); setTimeout(() => R().update({ state: 'battle' }), 3600); }
+    if (once(key)) {
+      SFX.play('whoosh');
+      const custom = vpackOf(pid) === 'gabe' ? 'gabefive' : vpackOf(pid) === 'mark' ? 'markone' : null;
+      const opener = room.phase === 'faceoff' && room.turnIdx === 0 ? 'vo_faceoff'
+                   : isFinal && room.turnIdx === 0 ? 'vo_final_phase' : null;
+      if (opener && custom) VOICE.queue([opener, custom]);
+      else if (opener) VOICE.say(opener);
+      else if (custom) VOICE.say(custom);
+      else VOICE.any(['vo_turn_1', 'vo_turn_2']);
+      setTimeout(() => R().update({ state: 'battle' }), 3600);
+    }
   }
 
   function battleShell(extra) {
@@ -1466,6 +1619,7 @@ const TV = (() => {
       battleScreenKey = bk; prevPredCount = 0;
       battleShell(`${esc(room.players[b.pid].name)} is choosing<span class="dots"></span>`);
       SFX.play('vs');
+      if (players().length > 1 && once('vo_callit')) setTimeout(() => VOICE.say('vo_callit'), 700);
     }
     const predCount = Object.keys(preds).length;
     if (predCount > prevPredCount) SFX.play('lock');
@@ -1492,7 +1646,9 @@ const TV = (() => {
       const guesses = Object.values(preds);
       const right = guesses.filter(g => g === b.pick).length;
       if (guesses.length >= 2 && right < guesses.length - right) {
-        setTimeout(() => { megaSplash('UPSET!', true); SFX.play('vs'); }, 500);
+        setTimeout(() => { megaSplash('UPSET!', true); SFX.play('vs'); VOICE.say('vo_upset'); }, 500);
+      } else if (Math.random() < .35) {
+        VOICE.any(['vo_win_1', 'vo_win_2', 'vo_win_3']);
       }
     }
     $('#bpA').classList.add(b.pick === 0 ? 'winner' : 'loser');
@@ -1644,6 +1800,11 @@ const TV = (() => {
 
     SFX.play('gold');
     confettiBurst(50);
+    const voq = ['vo_awards'];
+    if (hb) voq.push('vo_heartbreaker');
+    if (ids.length >= 3) voq.push('vo_twins', 'vo_contrarian');
+    if (ez) voq.push('vo_easyread');
+    VOICE.queue(voq);
     stage().innerHTML = `
       <div class="awards-scroll"><div class="awards-inner">
         <div class="tv-caption">The awards<span class="accent">!</span></div>
@@ -1677,7 +1838,8 @@ const TV = (() => {
       ${matchBanner}
       <div class="showcase-grid">${cards}</div>
       <div class="tv-sub" style="margin-top:24px"><button class="btn ghost" id="againBtn">🔁 New game</button></div>`;
-    if (match) setTimeout(() => SFX.play('win'), 600);
+    if (once('vo_showcase')) VOICE.say('vo_showcase');
+    if (match) setTimeout(() => { SFX.play('win'); VOICE.say('vo_same_type'); }, 1600);
     $('#againBtn').onclick = async () => { await db.ref('rooms/' + code).remove(); sessionStorage.removeItem('ht_tv'); location.reload(); };
   }
 
@@ -1698,7 +1860,7 @@ const TV = (() => {
     for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) pairs.push([ids[i], ids[j]]);
     if (ids.length === 3) pairs = pairs.concat(pairs.map(p => [p[1], p[0]]));
     const scores = {}; ids.forEach(pid => scores[pid] = 0);
-    playStartFx();
+    playStartFx('vo_sd_start');
     R().update({
       state: 'sdDraft', mode: 'showdown',
       showdown: { deal, keep, hands, kept: null, used: null, schedule: shuffle(pairs), duelIdx: 0, duel: null, scores, sweeps: null, finale: false }
@@ -1717,6 +1879,7 @@ const TV = (() => {
   function renderSdDraftTV() {
     const sd = room.showdown, ps = players();
     const kept = sd.kept || {};
+    if (once('vo_sd_draft')) setTimeout(() => VOICE.say('vo_sd_draft'), 3200);
     stage().innerHTML = `
       <div class="tv-caption">⚔️ Draft your squad<span class="accent">!</span></div>
       <div class="tv-sub" style="margin:0 0 20px">Everyone got ${sd.deal} secret photos — keep your best ${sd.keep}. Choose fighters the <b style="color:var(--cream)">room</b> will vote for, not just your favorites…</div>
@@ -1727,6 +1890,7 @@ const TV = (() => {
     const ids = ps.map(([pid]) => pid);
     if (ids.every(pid => kept[pid]) && once('sdDraftDone')) {
       SFX.play('gold');
+      VOICE.say('vo_sd_draft_done');
       setTimeout(() => startDuel(0), 1200);
     }
   }
@@ -1768,8 +1932,14 @@ const TV = (() => {
     };
     const key = `sdDuel:${sd.duelIdx}:${d.rematch || 0}:${d.finale ? 'F' : ''}`;
     if (once('snd:' + key)) {
-      if (d.finale && !d.rematch) { megaSplash('GRAND FINALE!'); SFX.play('fanfare'); confettiBurst(40); }
-      else SFX.play('vs');
+      const inDuel = pack => { const t = taggedPid(pack); return t && (d.a === t || d.b === t); };
+      if (d.finale && !d.rematch) { megaSplash('GRAND FINALE!'); SFX.play('fanfare'); confettiBurst(40); VOICE.say('vo_sd_finale'); }
+      else if (d.rematch) { SFX.play('vs'); VOICE.say(inDuel('mark') ? 'markfour' : 'vo_sd_sudden'); }
+      else {
+        SFX.play('vs');
+        if (inDuel('gabe') && Math.random() < .6) VOICE.say('gabetwo');
+        else VOICE.any(['vo_sd_duel_1', 'vo_sd_duel_2', 'vo_sd_duel_3']);
+      }
     }
     const cap = d.finale
       ? (d.rematch ? '🔥 Finale sudden death<span class="accent">!</span>' : '🏆 Grand Finale — worth <span class="accent">2 points</span>')
@@ -1799,7 +1969,7 @@ const TV = (() => {
     if (sdVoteKey !== vk || !$('#sdVoters')) {
       sdVoteKey = vk;
       renderSdVoteTV._prev = 0;
-      if (once('snd:' + vk)) SFX.play('whoosh');
+      if (once('snd:' + vk)) { SFX.play('whoosh'); VOICE.say('vo_sd_cards_in'); }
       const taunts = d.taunts || {};
       stage().innerHTML = `
         ${scoreStrip()}
@@ -1871,7 +2041,7 @@ const TV = (() => {
 
     if (lCount === rCount) {
       // tie → sudden death if both still have cards, else coin flip
-      megaSplash('TIE!', true); SFX.play('vs');
+      megaSplash('TIE!', true); SFX.play('vs'); VOICE.say('vo_sd_tie');
       const hasCards = p2 => {
         if (d.finale) return true;   // finale revives empty hands
         const kept = ((sd.kept || {})[p2]) || [];
@@ -1888,6 +2058,7 @@ const TV = (() => {
       $('#sdSub').innerHTML = `🪙 The coin says <b style="color:var(--gold)">${esc(room.players[winner].name)}</b>!`;
       u[`showdown/scores/${winner}`] = ((sd.scores || {})[winner] || 0) + (d.finale ? 2 : 1);
       SFX.play('win');
+      VOICE.say('vo_sd_coin');
       await sleep(2200);
       await R().update(u);
       startDuel(d.finale ? sd.schedule.length : sd.duelIdx + 1);
@@ -1895,19 +2066,26 @@ const TV = (() => {
     }
 
     const winSide = lCount > rCount ? 'L' : 'R';
-    const winner = winSide === 'L' ? L : Rr;
+    const winner = winSide === 'L' ? L : Rr, loser = winSide === 'L' ? Rr : L;
     $('#sd' + winSide).classList.add('winner');
     $('#sd' + (winSide === 'L' ? 'R' : 'L')).classList.add('loser');
     SFX.play('win');
     const sweep = (winSide === 'L' ? rCount : lCount) === 0 && Object.keys(votes).length >= 2;
     let pts = d.finale ? 2 : 1;
+    sdLosses[loser] = (sdLosses[loser] || 0) + 1;
+    const voq = [];
     if (sweep) {
       await sleep(500);
       megaSplash('SWEEP! +1');
       SFX.play('gold'); confettiBurst(60);
+      voq.push('vo_sd_sweep');
       pts += 1;
       u[`showdown/sweeps/${winner}`] = ((sd.sweeps || {})[winner] || 0) + 1;
     }
+    if (vpackOf(winner) === 'gabe') voq.push('gabefour');
+    if (vpackOf(loser) === 'mark') voq.push(sdLosses[loser] === 3 ? 'markfive' : 'markthree');
+    if (!voq.length) voq.push(['vo_win_1', 'vo_win_2', 'vo_win_3'][Math.floor(Math.random() * 3)]);
+    VOICE.queue(voq);
     $('#sdSub').innerHTML = `<b style="color:var(--gold)">${esc(room.players[winner].name)}</b> takes it${d.finale ? ' — and the finale!' : sweep ? ' — unanimous, bonus point!' : '!'}`;
     u[`showdown/scores/${winner}`] = ((sd.scores || {})[winner] || 0) + pts;
     await sleep(sweep ? 2600 : 2400);
@@ -1920,6 +2098,7 @@ const TV = (() => {
     const ranked = players().map(([pid, p]) => [pid, p, (sd.scores || {})[pid] || 0]).sort((a, b) => b[2] - a[2]);
     confettiBurst(140);
     SFX.play('fanfare');
+    VOICE.say('vo_sd_champ');
     const pods = ranked.map(([pid, p, sc], i) => `
       <div class="sd-pod card${i === 0 ? ' first' : ''}" style="animation-delay:${i * .15}s">
         ${i === 0 ? '<div class="crown">👑</div>' : ''}
