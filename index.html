@@ -638,6 +638,7 @@ input[type=text]::placeholder{color:#6E5CA8;font-weight:600}
     <div class="tv-top">
       <div class="tv-logo">HEART♥THROB</div>
       <div style="display:flex;align-items:center;gap:12px">
+        <button class="snd-btn" id="fsBtn" title="Fullscreen">⛶</button>
         <button class="snd-btn" id="resetBtn" title="Reset game">🔄</button>
         <button class="snd-btn" id="sndBtn" title="Sound on/off">🔊</button>
         <div class="roomcode-pill"><span class="tag">Room</span><b id="tvCode">----</b></div>
@@ -1318,6 +1319,16 @@ const TV = (() => {
     const sb = $('#sndBtn');
     sb.textContent = SFX.isMuted() ? '🔇' : '🔊';
     sb.onclick = () => { sb.textContent = SFX.toggleMute() ? '🔇' : '🔊'; };
+    const fs = $('#fsBtn');
+    const toggleFs = () => {
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+      else document.documentElement.requestFullscreen().catch(() => toast('Fullscreen blocked — try pressing F11.'));
+    };
+    fs.onclick = toggleFs;
+    document.addEventListener('fullscreenchange', () => { fs.textContent = document.fullscreenElement ? '🗗' : '⛶'; });
+    document.addEventListener('keydown', e => {
+      if (e.key.toLowerCase() === 'f' && !e.repeat && !/input|textarea|select/i.test((e.target || {}).tagName || '')) toggleFs();
+    });
     $('#resetBtn').onclick = async () => {
       if (!confirm('Reset the game? This kicks all players and starts a fresh room with a new code.')) return;
       await db.ref('rooms/' + code).remove();
