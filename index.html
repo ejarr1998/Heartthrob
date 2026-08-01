@@ -112,14 +112,28 @@ input[type=text]::placeholder{color:#6E5CA8;font-weight:600}
 #tvView .tv-shell{min-height:100vh;display:flex;flex-direction:column;padding:26px 34px}
 .tv-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
 .tv-logo{font-family:'Bungee';font-size:26px;color:var(--rose);filter:drop-shadow(0 3px 0 rgba(0,0,0,.4))}
-.roomcode-pill{display:flex;align-items:center;gap:10px;background:var(--ink2);border:1px solid var(--line);
-  border-radius:999px;padding:8px 18px}
-.roomcode-pill .tag{font-size:11px}
-.roomcode-pill b{font-family:'Bungee';font-size:22px;color:var(--gold);letter-spacing:.1em}
-.tv-stage{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative}
+.roomcode-pill{display:flex;align-items:center;gap:12px;background:var(--ink2);border:1px solid var(--line);
+  border-radius:999px;padding:10px 24px}
+.roomcode-pill .tag{font-size:14px}
+.roomcode-pill b{font-family:'Bungee';font-size:clamp(26px,3.4vw,42px);color:var(--gold);letter-spacing:.14em}
+.snd-btn{background:var(--ink2);border:1px solid var(--line);border-radius:999px;width:46px;height:46px;
+  font-size:20px;cursor:pointer;color:var(--cream);transition:transform .12s}
+.snd-btn:active{transform:scale(.9)}
+.tv-stage{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;min-height:0}
 .tv-caption{font-family:'Bungee';font-size:clamp(20px,3vw,34px);text-align:center;margin-bottom:18px}
 .tv-caption .accent{color:var(--rose)}
 .tv-sub{color:var(--muted);font-weight:700;text-align:center;font-size:16px;margin-top:14px;min-height:22px}
+/* split layout: giant photos + info rail */
+.tv-split{display:flex;align-items:center;justify-content:center;gap:clamp(20px,3vw,46px);width:100%;flex:1;min-height:0}
+.tv-side{flex:0 0 clamp(200px,20vw,280px);display:flex;flex-direction:column;align-items:center;gap:16px}
+.tv-side .tv-caption{margin:0;font-size:clamp(24px,2.6vw,40px)}
+.tv-side .tv-sub{margin:0}
+.tv-main{position:relative;flex:0 1 auto;min-width:0}
+.tv-split .grid2{width:min(86vh,calc(100vw - clamp(320px,30vw,460px)));max-width:none}
+.tv-side .waiting-avatars{flex-wrap:wrap;max-width:230px}
+.tv-side .waiting-avatars .wa{width:56px;height:56px;border-width:4px}
+.lobby-code{font-family:'Bungee';font-size:clamp(60px,11vw,140px);color:var(--gold);letter-spacing:.16em;
+  line-height:1;margin:6px 0 2px;filter:drop-shadow(0 6px 0 rgba(0,0,0,.35))}
 
 /* lobby players */
 .lobby-grid{display:flex;flex-wrap:wrap;gap:22px;justify-content:center;max-width:900px;margin:10px 0 26px}
@@ -158,13 +172,16 @@ input[type=text]::placeholder{color:#6E5CA8;font-weight:600}
 }
 .chip.gold1{width:66px;height:66px;border-color:var(--gold)}
 .chip.gold1 .rk{background:var(--gold);color:#4A3405;border-color:#fff}
-.rank-banner{position:absolute;top:-4px;left:50%;transform:translateX(-50%) translateY(-110%);
-  font-family:'Bungee';font-size:clamp(18px,2.4vw,28px);white-space:nowrap;color:var(--muted)}
-.rank-banner.gold{color:var(--gold)}
+.rank-banner{position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:5;
+  font-family:'Bungee';font-size:clamp(22px,3vw,40px);white-space:nowrap;color:var(--cream);
+  background:rgba(25,16,54,.82);border:2px solid var(--line);border-radius:14px;padding:8px 22px;
+  box-shadow:var(--shadow);backdrop-filter:blur(3px)}
+.rank-banner:empty{display:none}
+.rank-banner.gold{color:var(--gold);border-color:var(--gold)}
 
 /* battle (faceoff / final) */
-.battle-wrap{display:flex;align-items:center;gap:28px}
-.bphoto{position:relative;width:min(38vh,380px);max-width:40vw;aspect-ratio:1/1;border-radius:22px;overflow:hidden;
+.battle-wrap{display:flex;align-items:center;gap:clamp(18px,2.6vw,38px)}
+.bphoto{position:relative;width:min(58vh,42vw);max-width:44vw;aspect-ratio:1/1;border-radius:22px;overflow:hidden;
   border:4px solid var(--line);box-shadow:var(--shadow);transition:transform .35s, border-color .35s, filter .45s, box-shadow .35s}
 .bphoto img{width:100%;height:100%;object-fit:cover}
 .bphoto.winner{border-color:var(--gold);transform:scale(1.06);
@@ -307,6 +324,12 @@ input[type=text]::placeholder{color:#6E5CA8;font-weight:600}
   background:rgba(10,5,25,.8);color:#fff;font-size:12px;font-weight:800;display:none;align-items:center;justify-content:center}
 .rslot:hover .rslot-x{display:flex}
 .readiness{position:sticky;bottom:14px;margin-top:26px;display:flex;justify-content:center}
+.rounds-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:6px 0 18px}
+.rounds-toolbar .btn{padding:9px 16px;font-size:14px}
+.rounds-toolbar .tb-sep{flex:0 0 1px;height:26px;background:var(--line);margin:0 4px}
+.rounds-toolbar select{background:var(--ink3);color:var(--cream);border:1px solid var(--line);border-radius:12px;
+  padding:9px 12px;font-weight:700;font-family:inherit;font-size:14px;max-width:200px}
+.btn.danger-ghost{color:#FF8AA0;border-color:rgba(255,92,122,.4)}
 .readiness .pill{background:var(--ink2);border:1px solid var(--line);border-radius:999px;padding:10px 22px;
   font-weight:800;box-shadow:var(--shadow)}
 .readiness .pill.ready{border-color:var(--teal);color:var(--teal)}
@@ -346,6 +369,36 @@ input[type=text]::placeholder{color:#6E5CA8;font-weight:600}
 .waiting-avatars .wa img{width:100%;height:100%;object-fit:cover}
 .waiting-avatars .wa.done{border-color:var(--teal);opacity:1}
 
+/* arrow-through-heart game start FX */
+.introFx{position:fixed;inset:0;z-index:300;display:flex;align-items:center;justify-content:center;overflow:hidden;
+  background:radial-gradient(ellipse at center, #2A1B52 0%, var(--ink) 70%)}
+.introFx .fxheart{position:relative;font-size:min(44vh,44vw);line-height:1;color:var(--rose);
+  filter:drop-shadow(0 14px 0 rgba(0,0,0,.35)) drop-shadow(0 0 60px rgba(255,92,122,.45));
+  animation:fxBeat 1s ease-in-out infinite}
+@keyframes fxBeat{0%,100%{transform:scale(1)}30%{transform:scale(1.06)}45%{transform:scale(.98)}60%{transform:scale(1.04)}}
+.introFx.hit .fxheart{animation:fxHit .55s cubic-bezier(.2,1.8,.4,1) both}
+@keyframes fxHit{0%{transform:scale(1) rotate(0)}25%{transform:scale(1.28) rotate(-7deg)}55%{transform:scale(.94) rotate(4deg)}100%{transform:scale(1.05) rotate(-2deg)}}
+.introFx .fxarrow{position:absolute;left:50%;top:50%;width:min(64vh,64vw);height:14px;
+  transform:translate(-50%,-50%) rotate(-14deg) translateX(-160vw);z-index:2}
+.introFx.fly .fxarrow{transition:transform .55s cubic-bezier(.6,0,.9,.4);transform:translate(-50%,-50%) rotate(-14deg) translateX(0)}
+.introFx .shaft{position:absolute;left:8%;right:7%;top:4px;height:6px;border-radius:3px;
+  background:linear-gradient(90deg,var(--gold),#FFE1A1);box-shadow:0 3px 0 rgba(0,0,0,.3)}
+.introFx .head{position:absolute;right:0;top:-8px;width:0;height:0;
+  border-top:15px solid transparent;border-bottom:15px solid transparent;border-left:34px solid var(--gold);
+  filter:drop-shadow(0 3px 0 rgba(0,0,0,.3))}
+.introFx .fletch{position:absolute;left:0;top:-9px;width:34px;height:32px;
+  background:repeating-linear-gradient(115deg,var(--rose) 0 6px,#FF8AA0 6px 12px);
+  clip-path:polygon(0 0,100% 18%,72% 50%,100% 82%,0 100%,26% 50%)}
+.introFx .fxtitle{position:absolute;bottom:12vh;left:0;right:0;text-align:center;font-family:'Bungee';
+  font-size:clamp(34px,6vw,76px);color:var(--cream);opacity:0;transform:scale(3);letter-spacing:.04em;
+  text-shadow:0 6px 0 rgba(0,0,0,.4)}
+.introFx.hit .fxtitle{animation:fxSlam .5s cubic-bezier(.2,1.4,.3,1) .1s both}
+@keyframes fxSlam{from{opacity:0;transform:scale(3)}to{opacity:1;transform:scale(1)}}
+.introFx.out{animation:fxOut .45s ease-in both}
+@keyframes fxOut{to{opacity:0;transform:scale(1.12)}}
+.introFx.shake{animation:fxShake .4s linear}
+@keyframes fxShake{0%,100%{translate:0 0}20%{translate:-14px 8px}40%{translate:12px -10px}60%{translate:-9px -6px}80%{translate:7px 9px}}
+
 /* config missing */
 #configGate{position:fixed;inset:0;z-index:200;background:var(--ink);display:none;align-items:center;justify-content:center;padding:24px}
 #configGate.on{display:flex}
@@ -360,6 +413,9 @@ input[type=text]::placeholder{color:#6E5CA8;font-weight:600}
   .battle-wrap{flex-direction:column;gap:12px}
   .bphoto{max-width:74vw;width:min(34vh,340px)}
   #tvView .tv-shell{padding:18px}
+  .tv-split{flex-direction:column;gap:16px}
+  .tv-side{flex:0 0 auto}
+  .tv-split .grid2{width:min(78vh,92vw)}
 }
 </style>
 </head>
@@ -435,7 +491,10 @@ input[type=text]::placeholder{color:#6E5CA8;font-weight:600}
   <div class="tv-shell">
     <div class="tv-top">
       <div class="tv-logo">HEART♥THROB</div>
-      <div class="roomcode-pill"><span class="tag">Room</span><b id="tvCode">----</b></div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <button class="snd-btn" id="sndBtn" title="Sound on/off">🔊</button>
+        <div class="roomcode-pill"><span class="tag">Room</span><b id="tvCode">----</b></div>
+      </div>
     </div>
     <div class="tv-stage" id="tvStage"></div>
   </div>
@@ -459,6 +518,14 @@ input[type=text]::placeholder{color:#6E5CA8;font-weight:600}
   <div class="studio-section card" style="padding:20px">
     <h2>Rounds</h2>
     <p class="hint">Hand-pick 4 photos for each of the 10 rounds. Tap an empty slot to choose from your library. A photo can technically repeat across rounds, but it'll be flagged so you notice.</p>
+    <div class="rounds-toolbar">
+      <button class="btn" id="randomizeBtn">🎲 Randomize (40 unique)</button>
+      <span class="tb-sep"></span>
+      <select id="presetSelect"><option value="">— presets —</option></select>
+      <button class="btn ghost" id="loadPresetBtn">Load</button>
+      <button class="btn ghost danger-ghost" id="delPresetBtn">🗑</button>
+      <button class="btn ghost" id="savePresetBtn">💾 Save current as preset</button>
+    </div>
     <div class="rounds-grid" id="roundsGrid"></div>
     <div class="readiness"><div class="pill" id="readyPill">Checking…</div></div>
   </div>
@@ -553,6 +620,65 @@ function confettiBurst(n = 90) {
 const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ';
 const makeCode = () => Array.from({length: 4}, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
 const RANK_WORDS = { 4: 'FOURTH PICK', 3: 'THIRD PICK', 2: 'RUNNER-UP', 1: 'NUMBER ONE' };
+
+/* ---------------- sound (WebAudio synth — no files) ---------------- */
+const SFX = (() => {
+  let ctx = null;
+  let muted = localStorage.getItem('ht_mute') === '1';
+  function ac() {
+    if (!ctx) { try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } }
+    if (ctx.state === 'suspended') ctx.resume();
+    return ctx;
+  }
+  // unlock on any gesture (browsers block audio until user interacts)
+  ['pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, () => ac(), { capture: true }));
+
+  function tone(c, { f = 440, f2 = null, type = 'sine', t = 0, dur = .15, vol = .18 }) {
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = type; o.frequency.setValueAtTime(f, c.currentTime + t);
+    if (f2 != null) o.frequency.exponentialRampToValueAtTime(Math.max(f2, 1), c.currentTime + t + dur);
+    g.gain.setValueAtTime(0, c.currentTime + t);
+    g.gain.linearRampToValueAtTime(vol, c.currentTime + t + .012);
+    g.gain.exponentialRampToValueAtTime(.0001, c.currentTime + t + dur);
+    o.connect(g).connect(c.destination);
+    o.start(c.currentTime + t); o.stop(c.currentTime + t + dur + .05);
+  }
+  function noise(c, { t = 0, dur = .3, vol = .2, from = 400, to = 2400 }) {
+    const len = c.sampleRate * dur, buf = c.createBuffer(1, len, c.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    const src = c.createBufferSource(); src.buffer = buf;
+    const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 1.1;
+    bp.frequency.setValueAtTime(from, c.currentTime + t);
+    bp.frequency.exponentialRampToValueAtTime(to, c.currentTime + t + dur);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0, c.currentTime + t);
+    g.gain.linearRampToValueAtTime(vol, c.currentTime + t + .03);
+    g.gain.exponentialRampToValueAtTime(.0001, c.currentTime + t + dur);
+    src.connect(bp).connect(g).connect(c.destination);
+    src.start(c.currentTime + t);
+  }
+  const fx = {
+    join:    c => { tone(c, { f: 540, type: 'square', dur: .09, vol: .1 }); tone(c, { f: 810, type: 'square', t: .09, dur: .12, vol: .1 }); },
+    lock:    c => tone(c, { f: 940, type: 'triangle', dur: .07, vol: .12 }),
+    stamp:   c => { tone(c, { f: 190, f2: 90, type: 'triangle', dur: .1, vol: .3 }); noise(c, { dur: .05, vol: .1, from: 1800, to: 900 }); },
+    rank:    (c, rank) => tone(c, { f: [0, 700, 560, 470, 400][rank] || 500, type: 'square', dur: .16, vol: .12 }),
+    gold:    c => [523, 659, 784, 1046].forEach((f, i) => tone(c, { f, type: 'triangle', t: i * .1, dur: .3, vol: .16 })),
+    vs:      c => { tone(c, { f: 300, f2: 82, type: 'sawtooth', dur: .32, vol: .17 }); noise(c, { dur: .22, vol: .08, from: 2600, to: 300 }); },
+    win:     c => { tone(c, { f: 660, type: 'triangle', dur: .12, vol: .15 }); tone(c, { f: 990, type: 'triangle', t: .11, dur: .24, vol: .15 }); },
+    whoosh:  c => noise(c, { dur: .55, vol: .24, from: 300, to: 3400 }),
+    thump:   c => { tone(c, { f: 150, f2: 42, type: 'sine', dur: .34, vol: .5 }); noise(c, { dur: .09, vol: .16, from: 1400, to: 200 }); },
+    fanfare: c => { [523, 659, 784, 1046, 1318].forEach((f, i) => tone(c, { f, type: 'triangle', t: i * .12, dur: .32, vol: .15 }));
+                    [262, 330, 392].forEach(f => tone(c, { f, type: 'sine', t: .6, dur: .9, vol: .09 })); },
+  };
+  function play(name, arg) {
+    if (muted) return;
+    const c = ac(); if (!c || c.state !== 'running') return;
+    try { fx[name] && fx[name](c, arg); } catch (e) {}
+  }
+  function toggleMute() { muted = !muted; localStorage.setItem('ht_mute', muted ? '1' : '0'); return muted; }
+  return { play, toggleMute, isMuted: () => muted };
+})();
 
 /* ---------------- router ---------------- */
 const views = ['landing', 'joinView', 'playView', 'tvView', 'hostView'];
@@ -682,13 +808,14 @@ const Crop = (() => {
    HOST STUDIO — library upload/edit/delete + round assignment
 ================================================================ */
 const Studio = (() => {
-  let library = {}, rounds = {}, booted = false;
+  let library = {}, rounds = {}, presets = {}, booted = false;
   const NUM_ROUNDS = 10, SLOTS = 4;
 
   function init() {
     if (booted) return; booted = true;
     db.ref('library').on('value', s => { library = s.val() || {}; renderLib(); renderRounds(); });
     db.ref('rounds').on('value', s => { rounds = s.val() || {}; renderLib(); renderRounds(); });
+    db.ref('presets').on('value', s => { presets = s.val() || {}; renderPresets(); });
     const drop = $('#uploadDrop'), input = $('#uploadInput');
     drop.onclick = () => input.click();
     drop.ondragover = e => { e.preventDefault(); drop.classList.add('dragover'); };
@@ -696,6 +823,87 @@ const Studio = (() => {
     drop.ondrop = e => { e.preventDefault(); drop.classList.remove('dragover'); handleFiles([...e.dataTransfer.files]); };
     input.onchange = () => { handleFiles([...input.files]); input.value = ''; };
     $('#pickerCancel').onclick = () => $('#pickerModal').classList.remove('on');
+    $('#randomizeBtn').onclick = randomize;
+    $('#savePresetBtn').onclick = savePreset;
+    $('#loadPresetBtn').onclick = loadPreset;
+    $('#delPresetBtn').onclick = deletePreset;
+  }
+
+  /* ---- randomize: 40 unique photos into the 10 rounds ---- */
+  async function randomize() {
+    const ids = Object.keys(library);
+    if (ids.length < 40) return toast(`Need at least 40 photos to randomize — you have ${ids.length}.`);
+    if (Object.keys(rounds).length && !confirm('Replace the current round assignments with a random draw of 40 unique photos?')) return;
+    const pick = shuffle(ids).slice(0, 40);
+    const next = {};
+    for (let r = 0; r < NUM_ROUNDS; r++) {
+      next[r] = {};
+      for (let s = 0; s < SLOTS; s++) next[r][s] = pick[r * SLOTS + s];
+    }
+    await db.ref('rounds').set(next);
+    toast('🎲 Rounds randomized — 40 unique photos, no repeats ✓');
+  }
+
+  /* ---- presets ---- */
+  function renderPresets() {
+    const sel = $('#presetSelect');
+    const prev = sel.value;
+    sel.innerHTML = '<option value="">— presets —</option>';
+    Object.entries(presets).sort((a, b) => b[1].ts - a[1].ts).forEach(([id, p]) => {
+      const o = document.createElement('option');
+      o.value = id; o.textContent = p.name;
+      sel.appendChild(o);
+    });
+    if (presets[prev]) sel.value = prev;
+  }
+
+  async function savePreset() {
+    const grid = [];
+    let filled = 0;
+    for (let r = 0; r < NUM_ROUNDS; r++) {
+      const row = [];
+      for (let s = 0; s < SLOTS; s++) {
+        const pid = rounds[r] && rounds[r][s];
+        row.push(pid && library[pid] ? pid : '');   // '' not null — RTDB drops nulls from arrays
+        if (row[s]) filled++;
+      }
+      grid.push(row);
+    }
+    if (!filled) return toast('The board is empty — nothing to save.');
+    if (filled < 40 && !confirm(`Only ${filled}/40 slots are filled. Save this incomplete board as a preset anyway?`)) return;
+    const name = (prompt('Name this preset:', `Preset ${Object.keys(presets).length + 1}`) || '').trim();
+    if (!name) return;
+    await db.ref('presets').push({ name, ts: Date.now(), rounds: grid });
+    toast(`💾 Preset "${name}" saved ✓`);
+  }
+
+  async function loadPreset() {
+    const id = $('#presetSelect').value;
+    if (!id || !presets[id]) return toast('Pick a preset from the dropdown first.');
+    const p = presets[id];
+    if (Object.keys(rounds).length && !confirm(`Load "${p.name}"? This replaces the current round assignments.`)) return;
+    const next = {};
+    let missing = 0;
+    const pr = p.rounds || {};
+    for (let r = 0; r < NUM_ROUNDS; r++) {
+      next[r] = {};
+      const row = pr[r] || {};
+      for (let s = 0; s < SLOTS; s++) {
+        const pid = row[s];
+        if (pid && library[pid]) next[r][s] = pid;
+        else if (pid) missing++;
+      }
+    }
+    await db.ref('rounds').set(next);
+    toast(missing ? `Preset loaded — ${missing} photo${missing > 1 ? 's were' : ' was'} deleted since saving, those slots are empty.` : `Preset "${p.name}" loaded ✓`);
+  }
+
+  async function deletePreset() {
+    const id = $('#presetSelect').value;
+    if (!id || !presets[id]) return toast('Pick a preset to delete first.');
+    if (!confirm(`Delete preset "${presets[id].name}"? (Photos stay in your library.)`)) return;
+    await db.ref('presets/' + id).remove();
+    toast('Preset deleted ✓');
   }
 
   async function handleFiles(files) {
@@ -869,6 +1077,9 @@ const TV = (() => {
 
   function listen() {
     $('#tvCode').textContent = code;
+    const sb = $('#sndBtn');
+    sb.textContent = SFX.isMuted() ? '🔇' : '🔊';
+    sb.onclick = () => { sb.textContent = SFX.toggleMute() ? '🔇' : '🔊'; };
     db.ref('rooms/' + code).on('value', s => { room = s.val(); if (room) render(); });
   }
 
@@ -891,12 +1102,16 @@ const TV = (() => {
   }
 
   /* ---------- lobby ---------- */
+  let prevPlayerCount = 0;
   function renderLobby() {
     const ps = players();
+    if (ps.length > prevPlayerCount) SFX.play('join');
+    prevPlayerCount = ps.length;
     const s = stage();
     s.innerHTML = `
-      <div class="tv-caption">Who's playing<span class="accent">?</span></div>
-      <div class="tv-sub" style="margin:0 0 8px">Open <b style="color:var(--cream)">${esc(location.origin + location.pathname)}</b> on your phone → room code <b style="color:var(--gold);font-family:'Bungee'">${code}</b></div>
+      <div class="tv-sub" style="margin:0">Open <b style="color:var(--cream);font-size:1.2em">${esc(location.origin + location.pathname)}</b> on your phone → enter this code:</div>
+      <div class="lobby-code">${code}</div>
+      <div class="tv-caption" style="margin:14px 0 0">Who's playing<span class="accent">?</span></div>
       <div class="lobby-grid" id="lobbyGrid"></div>
       <button class="btn big gold" id="startBtn" ${ps.length < 2 ? 'disabled' : ''}>Start the show ▶</button>
       <div class="tv-sub">${ps.length < 2 ? 'Need at least 2 players' : ps.length > 6 ? 'Max 6 players!' : ps.length + ' player' + (ps.length > 1 ? 's' : '') + ' ready'}</div>`;
@@ -908,26 +1123,52 @@ const TV = (() => {
     });
     const btn = s.querySelector('#startBtn');
     if (ps.length > 6) btn.disabled = true;
-    btn.onclick = () => R().update({ state: 'vote' });
+    btn.onclick = () => { playStartFx(); R().update({ state: 'vote' }); };
+  }
+
+  /* ---------- arrow-through-heart start FX ---------- */
+  function playStartFx() {
+    const fx = el('div', 'introFx', `
+      <div class="fxheart">♥</div>
+      <div class="fxarrow"><div class="fletch"></div><div class="shaft"></div><div class="head"></div></div>
+      <div class="fxtitle">LET'S FIND YOUR TYPE</div>`);
+    document.body.appendChild(fx);
+    SFX.play('whoosh');
+    requestAnimationFrame(() => requestAnimationFrame(() => fx.classList.add('fly')));
+    setTimeout(() => {
+      fx.classList.add('hit', 'shake');
+      SFX.play('thump');
+      confettiBurst(70);
+      setTimeout(() => SFX.play('gold'), 250);
+    }, 560);
+    setTimeout(() => { fx.classList.remove('shake'); fx.classList.add('out'); }, 2500);
+    setTimeout(() => fx.remove(), 3000);
   }
 
   /* ---------- voting round ---------- */
-  let voteScreenRound = -1;
+  let voteScreenRound = -1, prevLockCount = 0;
   function renderVote() {
     const r = room.round, ps = players();
     const votes = (room.votes && room.votes[r]) || {};
     if (voteScreenRound !== r || !$('#tvGrid')) {
-      voteScreenRound = r;
+      voteScreenRound = r; prevLockCount = 0;
       stage().innerHTML = `
-        <div class="tv-caption">Round <span class="accent">${r + 1}</span> of 10</div>
-        <div class="grid2" id="tvGrid"></div>
-        <div class="tv-sub">Rank them 1–4 on your phones!</div>
-        <div class="waiting-avatars" id="waitRow"></div>`;
+        <div class="tv-split">
+          <div class="tv-main"><div class="grid2" id="tvGrid"></div></div>
+          <div class="tv-side">
+            <div class="tv-caption">Round<br><span class="accent" style="font-size:1.8em">${r + 1}</span><span style="font-size:.6em;color:var(--muted)"> / 10</span></div>
+            <div class="tv-sub">Rank them 1–4 on your phones!</div>
+            <div class="waiting-avatars" id="waitRow"></div>
+          </div>
+        </div>`;
       const g = $('#tvGrid');
       'ABCD'.split('').forEach((L, i) => {
         g.appendChild(el('div', 'gphoto', `<img src="${room.rounds[r][i]}" alt=""><span class="corner">${L}</span><div class="chips"></div>`));
       });
     }
+    const lockCount = ps.filter(([pid]) => votes[pid]).length;
+    if (lockCount > prevLockCount) SFX.play('lock');
+    prevLockCount = lockCount;
     const w = $('#waitRow'); w.innerHTML = '';
     ps.forEach(([pid, p]) => w.appendChild(el('div', 'wa' + (votes[pid] ? ' done' : ''), `<img src="${p.avatar}" alt="">`)));
     // all in?
@@ -943,12 +1184,16 @@ const TV = (() => {
   async function playReveal() {
     const r = room.round, ps = players(), votes = room.votes[r];
     stage().innerHTML = `
-      <div class="tv-caption">The verdict<span class="accent">!</span></div>
-      <div style="position:relative">
-        <div class="rank-banner" id="rankBanner"></div>
-        <div class="grid2" id="tvGrid"></div>
-      </div>
-      <div class="tv-sub" id="revealSub"></div>`;
+      <div class="tv-split">
+        <div class="tv-main">
+          <div class="rank-banner" id="rankBanner"></div>
+          <div class="grid2" id="tvGrid"></div>
+        </div>
+        <div class="tv-side">
+          <div class="tv-caption">The verdict<span class="accent">!</span></div>
+          <div class="tv-sub" id="revealSub"></div>
+        </div>
+      </div>`;
     const g = $('#tvGrid');
     'ABCD'.split('').forEach((L, i) => {
       g.appendChild(el('div', 'gphoto', `<img src="${room.rounds[r][i]}" alt=""><span class="corner">${L}</span><div class="chips"></div>`));
@@ -960,6 +1205,7 @@ const TV = (() => {
       banner.style.animation = 'none'; void banner.offsetWidth;
       banner.style.animation = 'popIn .4s cubic-bezier(.2,1.6,.4,1) both';
       banner.textContent = RANK_WORDS[rank];
+      SFX.play('rank', rank);
       await sleep(650);
       for (const [pid, p] of ps) {
         if (!votes[pid]) continue;
@@ -967,6 +1213,7 @@ const TV = (() => {
         const chip = el('div', 'chip stamp' + (rank === 1 ? ' gold1' : ''),
           `<img src="${p.avatar}" alt=""><span class="rk">${rank}</span>`);
         g.children[idx].querySelector('.chips').appendChild(chip);
+        SFX.play('stamp');
         await sleep(380);
       }
       await sleep(rank === 1 ? 500 : 850);
@@ -974,6 +1221,7 @@ const TV = (() => {
     // glow every photo that took a #1
     new Set(ps.filter(([pid]) => votes[pid]).map(([pid]) => votes[pid][0])).forEach(i => g.children[i].classList.add('won1'));
     confettiBurst(36);
+    SFX.play('gold');
     const sub = $('#revealSub');
     const next = el('button', 'btn gold', room.round < 9 ? `Round ${room.round + 2} ▶` : 'To the faceoffs! ⚔️');
     next.onclick = () => {
@@ -1016,7 +1264,7 @@ const TV = (() => {
       <p style="color:var(--teal)">📱 Everyone else: get ready to <b>Call It!</b></p>
     </div>`;
     const key = `intro:${room.phase}:${room.turnIdx}`;
-    if (once(key)) setTimeout(() => R().update({ state: 'battle' }), 3600);
+    if (once(key)) { SFX.play('whoosh'); setTimeout(() => R().update({ state: 'battle' }), 3600); }
   }
 
   function battleShell(extra) {
@@ -1034,14 +1282,18 @@ const TV = (() => {
       <div class="tv-sub" id="battleSub">${extra || ''}</div>`;
   }
 
-  let battleScreenKey = '';
+  let battleScreenKey = '', prevPredCount = 0;
   function renderBattle() {
     const b = room.battle, preds = b.predictions || {};
     const bk = `battle:${room.phase}:${room.turnIdx}:${b.num}`;
     if (battleScreenKey !== bk || !$('#predRow')) {
-      battleScreenKey = bk;
+      battleScreenKey = bk; prevPredCount = 0;
       battleShell(`${esc(room.players[b.pid].name)} is choosing<span class="dots"></span>`);
+      SFX.play('vs');
     }
+    const predCount = Object.keys(preds).length;
+    if (predCount > prevPredCount) SFX.play('lock');
+    prevPredCount = predCount;
     const row = $('#predRow'); row.innerHTML = '';
     players().forEach(([pid, p]) => {
       if (pid === b.pid) return;
@@ -1059,6 +1311,7 @@ const TV = (() => {
     const b = room.battle, preds = b.predictions || {};
     battleScreenKey = '';
     battleShell('');
+    if (once(`winSnd:${room.phase}:${room.turnIdx}:${b.num}`)) SFX.play('win');
     $('#bpA').classList.add(b.pick === 0 ? 'winner' : 'loser');
     $('#bpB').classList.add(b.pick === 1 ? 'winner' : 'loser');
     const row = $('#predRow');
@@ -1114,6 +1367,7 @@ const TV = (() => {
   /* ---------- finale ---------- */
   function renderShowcase() {
     confettiBurst(140);
+    SFX.play('fanfare');
     const cards = room.turnOrder.map(pid => {
       const p = room.players[pid];
       return `<div class="show-card card">
