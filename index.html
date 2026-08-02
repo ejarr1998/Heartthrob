@@ -546,6 +546,45 @@ input[type=text]::placeholder{color:#6E5CA8;font-weight:600}
 .introFx.shake{animation:fxShake .4s linear}
 @keyframes fxShake{0%,100%{translate:0 0}20%{translate:-14px 8px}40%{translate:12px -10px}60%{translate:-9px -6px}80%{translate:7px 9px}}
 
+
+/* ================ CAPTION mode (She's a 10 but…) ================ */
+.cap-stage{display:flex;align-items:center;gap:clamp(18px,3vw,40px);justify-content:center;flex-wrap:wrap}
+.cap-photo{width:min(42vh,32vw);aspect-ratio:1/1;border-radius:20px;overflow:hidden;border:4px solid var(--line);box-shadow:var(--shadow)}
+.cap-photo img{width:100%;height:100%;object-fit:cover}
+.cap-opts{display:flex;flex-direction:column;gap:14px;width:min(520px,88vw)}
+.cap-opt{position:relative;background:var(--ink2);border:3px solid var(--line);border-radius:18px;padding:16px 20px;
+  font-weight:800;font-size:clamp(16px,1.9vw,25px);color:var(--cream);text-align:center;box-shadow:var(--shadow);
+  animation:popIn .45s cubic-bezier(.2,1.6,.4,1) both}
+.cap-opt .votes{position:absolute;top:-13px;right:-10px;background:var(--gold);color:#4A3405;border-radius:999px;
+  font-family:'Bungee';font-size:15px;padding:3px 11px;border:2px solid #fff;opacity:0}
+.cap-opt .votes.on{opacity:1;animation:popIn .3s both}
+.cap-opt .owner{display:inline-flex;align-items:center;gap:8px;background:rgba(12,6,30,.85);border-radius:999px;
+  padding:4px 14px 4px 4px;font-weight:800;font-size:15px;margin-top:10px;animation:popIn .45s cubic-bezier(.2,1.6,.4,1) both}
+.cap-opt .owner .pav{width:34px;height:34px;border-width:2px}
+.cap-opt.winner{border-color:var(--gold);box-shadow:0 0 0 3px rgba(255,194,75,.35),0 0 34px rgba(255,194,75,.4),var(--shadow)}
+.cap-opt.loser{opacity:.5}
+.cap-prompt{color:var(--muted);font-weight:800;font-size:clamp(14px,1.6vw,19px);margin-bottom:14px;text-align:center}
+.cap-timer{font-family:'Bungee';font-size:20px;color:var(--gold);background:var(--ink2);border:1px solid var(--line);
+  border-radius:999px;padding:6px 20px;margin-bottom:16px}
+.cap-write-grid{display:flex;flex-wrap:wrap;gap:18px;justify-content:center;max-width:1000px}
+.cap-write-item{width:150px;text-align:center}
+.cap-write-item>img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:14px;border:3px solid var(--line);display:block}
+.cap-entry{display:flex;align-items:center;gap:14px;background:var(--ink2);border:2px solid var(--line);border-radius:16px;
+  padding:12px 18px;animation:popIn .45s both}
+.cap-entry.first{border-color:var(--gold)}
+.cap-entry .cap-vc{font-family:'Bungee';font-size:24px;color:var(--gold);min-width:44px;text-align:center}
+.cap-entry .cap-txt{flex:1;font-weight:800;font-size:clamp(15px,1.7vw,21px);text-align:left}
+.cap-entry .cap-who .pav{width:44px;height:44px;border-width:3px}
+/* caption mode — phone */
+.cap-ta{width:100%;min-height:92px;font-family:'Outfit';font-weight:700;font-size:18px;color:var(--cream);
+  background:var(--ink);border:2px solid var(--line);border-radius:12px;padding:13px 16px;outline:none;resize:none}
+.cap-ta:focus{border-color:var(--rose)}
+.cap-pick{display:block;width:100%;text-align:left;background:var(--ink2);border:3px solid var(--line);border-radius:14px;
+  padding:14px 16px;font-weight:800;font-size:16px;color:var(--cream);margin:10px 0}
+.cap-pick.chosen{border-color:var(--gold);box-shadow:0 0 0 3px rgba(255,194,75,.3)}
+.cap-mini{width:min(60vw,240px);aspect-ratio:1/1;border-radius:16px;overflow:hidden;border:3px solid var(--line);margin:0 auto 12px}
+.cap-mini img{width:100%;height:100%;object-fit:cover}
+
 /* config missing */
 #configGate{position:fixed;inset:0;z-index:200;background:var(--ink);display:none;align-items:center;justify-content:center;padding:24px}
 #configGate.on{display:flex}
@@ -781,6 +820,52 @@ function confettiBurst(n = 90) {
 const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ';
 const makeCode = () => Array.from({length: 4}, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
 const RANK_WORDS = { 4: 'FOURTH PICK', 3: 'THIRD PICK', 2: 'RUNNER-UP', 1: 'NUMBER ONE' };
+
+/* ---------------- caption mode (She's a 10 but…) data ---------------- */
+const CAP_PROMPTS = [
+  "She's a 10 but ___",
+  "Her dating bio just says ___",
+  "She ghosted you because ___",
+  "First thing she says on the date: ___",
+  "Her red flag: ___",
+  "She's your soulmate, but she insists ___",
+  "Her toxic trait: ___",
+  "On the first date she orders ___",
+  "She still sleeps with ___",
+  "Her idea of a perfect Sunday is ___",
+  "She's wife material, except ___",
+  "Her camera roll is 90% ___"
+];
+const CAP_ICK = ["She seems perfect… until ___", "Instant ick: she ___"];
+// house captions — phantom writer so 2-player games and odd player counts work
+const HOUSE_CAPTIONS = [
+  "she claps when the plane lands",
+  "her ex is 'still her best friend'",
+  "she live-texts the date to the group chat",
+  "she asks your star sign before your name",
+  "she brings her mom. to the date",
+  "she only eats food that's beige",
+  "she says 'I'm fluent in sarcasm'",
+  "her Spotify Wrapped is one song",
+  "she takes 45 minutes to order coffee",
+  "she has a ranking spreadsheet. of you",
+  "she saves your contact as 'DO NOT ANSWER'",
+  "she's 'not like other girls' (she is)",
+  "she makes you hold her purse at parties",
+  "she says 'we need to talk' then goes offline",
+  "she photographs the receipt",
+  "she knows the bartender. all of them",
+  "she says 'my tarot reader warned me about you'",
+  "she ends every text with a thumbs up",
+  "she names her plants after exes",
+  "she asks for 'the usual' everywhere",
+  "she keeps 'accidentally' liking your 2019 posts",
+  "her hobby is red flags",
+  "she Venmo-requests you $1.50",
+  "she rates the date mid-date"
+];
+let houseIdx = Math.floor(Math.random() * HOUSE_CAPTIONS.length);
+const houseCap = () => HOUSE_CAPTIONS[(houseIdx++) % HOUSE_CAPTIONS.length];
 
 /* ---------------- sound (WebAudio synth — no files) ---------------- */
 const SFX = (() => {
@@ -1412,6 +1497,19 @@ const TV = (() => {
     } else if (st === 'battle') {
       const b = room.battle;
       armIdle('battle:' + room.phase + ':' + room.turnIdx + ':' + b.num, b.pick == null, b.pid);
+    } else if (st === 'capWrite') {
+      const c = room.caption;
+      const missing = players().filter(([pid]) => {
+        if (c.finale) return !(c.finaleCaps || {})[pid];
+        const m = (c.rounds[c.round] || []).find(m2 => m2.a === pid || m2.b === pid);
+        return m && !(m.a === pid ? m.capA : m.capB);
+      });
+      armIdle('capW:' + c.round + ':' + (c.finale ? 'F' : ''), missing.length > 0, missing.length === 1 ? missing[0][0] : null);
+    } else if (st === 'capVote') {
+      const c = room.caption, m = c.finale ? null : c.rounds[c.round][c.matchupIdx];
+      const votes = c.finale ? (c.finaleVotes || {}) : (m.votes || {});
+      const missing = players().filter(([pid]) => (c.finale || (pid !== m.a && pid !== m.b)) && votes[pid] == null);
+      armIdle('capV:' + c.round + ':' + c.matchupIdx + ':' + (c.finale ? 'F' : ''), missing.length > 0, missing.length === 1 ? missing[0][0] : null);
     } else armIdle('none', false);
     // sudden-death heartbeat: only while a rematch duel is being picked
     const wantHB = st === 'sdDuel' && room.showdown && room.showdown.duel && room.showdown.duel.rematch;
@@ -1430,6 +1528,10 @@ const TV = (() => {
     else if (st === 'sdVote') renderSdVoteTV();
     else if (st === 'sdReveal') { if (once('sdReveal:' + room.showdown.duelIdx + ':' + (room.showdown.duel.rematch || 0))) playSdReveal(); }
     else if (st === 'sdFinal') { if (once('sdFinal')) renderSdFinal(); }
+    else if (st === 'capWrite') renderCapWriteTV();
+    else if (st === 'capVote') renderCapVoteTV();
+    else if (st === 'capReveal') { if (once('capReveal:' + room.caption.round + ':' + room.caption.matchupIdx + ':' + (room.caption.finale ? 'F' : ''))) playCapReveal(); }
+    else if (st === 'capFinal') { if (once('capFinal')) renderCapFinal(); }
   }
 
   /* ---------- lobby ---------- */
@@ -1455,6 +1557,7 @@ const TV = (() => {
       <div class="mode-row">
         <button class="btn big gold" id="startBtn" ${ps.length < 2 ? 'disabled' : ''}>💘 Find Your Type ▶</button>
         <button class="btn big teal" id="sdBtn" ${ps.length < 3 ? 'disabled' : ''}>⚔️ Showdown ▶</button>
+        <button class="btn big" id="capBtn" ${ps.length < 2 ? 'disabled' : ''}>😂 She's a 10 but… ▶</button>
       </div>
       <div class="tv-sub">${ps.length < 2 ? 'Need at least 2 players' : ps.length > 6 ? 'Max 6 players!' : ps.length + ' player' + (ps.length > 1 ? 's' : '') + ' ready' + (ps.length < 3 ? ' · Showdown needs 3+' : '')}</div>`;
     if (window.QRCode) new QRCode($('#lobbyQR'), { text: location.origin + location.pathname, width: 150, height: 150, correctLevel: QRCode.CorrectLevel.M });
@@ -1476,6 +1579,9 @@ const TV = (() => {
     const sdb = s.querySelector('#sdBtn');
     if (ps.length > 6) sdb.disabled = true;
     sdb.onclick = () => startShowdown();
+    const capb = s.querySelector('#capBtn');
+    if (ps.length > 6) capb.disabled = true;
+    capb.onclick = () => startCaption();
   }
 
   /* ---------- arrow-through-heart start FX ---------- */
@@ -2163,6 +2269,320 @@ const TV = (() => {
     $('#sdAgainBtn').onclick = async () => { await db.ref('rooms/' + code).remove(); sessionStorage.removeItem('ht_tv'); location.reload(); };
   }
 
+
+  /* ================================================================
+     CAPTION — She's a 10 but… (Quiplash-style)
+     write captions on photos → anonymous head-to-head votes → points
+  ================================================================ */
+  const CAP_ROUNDS = 3, CAP_WRITE_MS = 60000;
+  let capTimerInt = null, capWriteDeadline = 0, capVoteKey = '';
+  function clearCapTimer() { if (capTimerInt) { clearInterval(capTimerInt); capTimerInt = null; } }
+
+  async function startCaption() {
+    const ps = players(), ids = ps.map(([pid]) => pid);
+    const libS = await db.ref('library').once('value');
+    const urls = shuffle(Object.values(libS.val() || {}).map(i => i.url));
+    const perRound = ids.length === 2 ? 2 : Math.ceil(ids.length / 2);   // 2p: each faces The House
+    const need = CAP_ROUNDS * perRound + 1;
+    if (urls.length < need) { toast(`Caption game needs at least ${need} photos in the library (you have ${urls.length}).`); return; }
+    let ui = 0;
+    const rounds = [];
+    for (let r = 0; r < CAP_ROUNDS; r++) {
+      const order = shuffle(ids), prompts = shuffle(CAP_PROMPTS), ms = [];
+      if (order.length === 2) {
+        // 2 players: pairing them together leaves zero voters — each faces The House instead
+        order.forEach(a => ms.push({ photo: urls[ui++], prompt: prompts[ms.length % prompts.length], a, b: 'HOUSE',
+                  capA: null, capB: houseCap(), flip: Math.random() < .5 ? 1 : 0, votes: null }));
+      } else {
+        for (let i = 0; i < order.length; i += 2) {
+          const a = order[i], b = order[i + 1] || 'HOUSE';
+          ms.push({ photo: urls[ui++], prompt: prompts[(i / 2) % prompts.length], a, b,
+                    capA: null, capB: b === 'HOUSE' ? houseCap() : null,
+                    flip: Math.random() < .5 ? 1 : 0, votes: null });
+        }
+      }
+      rounds.push(ms);
+    }
+    const scores = {}; ids.forEach(pid => scores[pid] = 0);
+    playStartFx(Math.random() < .5 ? 'vo_start_1' : 'vo_start_2');
+    R().update({
+      state: 'capWrite', mode: 'caption',
+      caption: { rounds, round: 0, matchupIdx: 0, finale: false, finalePrompt: null,
+                 finalePhoto: urls[ui], finaleCaps: null, finaleVotes: null, scores, best: null }
+    });
+  }
+
+  function capScoreStrip() {
+    const c = room.caption, ps = players();
+    const max = Math.max(...ps.map(([pid]) => (c.scores || {})[pid] || 0));
+    return `<div class="score-strip">` + ps.map(([pid, p]) => {
+      const sc = (c.scores || {})[pid] || 0;
+      return `<div class="score-chip${sc === max && max > 0 ? ' lead' : ''}">${pav(p.avatar)}${esc(p.name)} · ${sc}</div>`;
+    }).join('') + `</div>`;
+  }
+
+  /* ---- write phase ---- */
+  function renderCapWriteTV() {
+    const c = room.caption, ps = players();
+    const key = `capW:${c.round}:${c.finale ? 'F' : ''}`;
+    if (once('snd:' + key)) {
+      clearCapTimer();
+      capWriteDeadline = Date.now() + CAP_WRITE_MS;
+      capTimerInt = setInterval(() => {
+        if (!room || room.state !== 'capWrite') return clearCapTimer();
+        const t = $('#capTimer'); if (!t) return;
+        const left = Math.max(0, Math.ceil((capWriteDeadline - Date.now()) / 1000));
+        t.textContent = '⏱ ' + left + 's';
+        if (left <= 0) { clearCapTimer(); capWriteDone(); }
+      }, 500);
+      VOICE.say(c.finale ? 'vo_final_round' : ['vo_round_1', 'vo_round_2', 'vo_round_3'][Math.floor(Math.random() * 3)]);
+    }
+    if (c.finale) {
+      const caps = c.finaleCaps || {};
+      stage().innerHTML = `
+        <div class="tv-caption">😂 The Ick<span class="accent">!</span></div>
+        <div class="cap-timer" id="capTimer"></div>
+        <div class="tv-sub" style="margin:0 0 14px">One photo. Everyone writes. Double points.</div>
+        <div class="cap-stage"><div class="cap-photo"><img src="${c.finalePhoto}" alt=""></div>
+          <div class="cap-opts"><div class="cap-prompt">${esc(c.finalePrompt || CAP_ICK[0])}</div>
+            <div class="waiting-avatars">${ps.map(([pid, p]) => `<div class="wa${caps[pid] ? ' done' : ''}"><img src="${p.avatar}" alt=""></div>`).join('')}</div>
+          </div></div>`;
+    } else {
+      const ms = c.rounds[c.round];
+      stage().innerHTML = `
+        <div class="tv-caption">😂 Round ${c.round + 1} — write<span class="accent">!</span></div>
+        <div class="cap-timer" id="capTimer"></div>
+        <div class="cap-write-grid">${ms.map(m => {
+          const in2 = m.capA && (m.b === 'HOUSE' || m.capB);
+          return `<div class="cap-write-item"><img src="${m.photo}" alt="">
+            <div class="cap-prompt" style="margin:8px 0 4px">${esc(m.prompt)}</div>
+            <div style="font-weight:800;font-size:13px;color:${in2 ? 'var(--teal)' : 'var(--muted)'}">${in2 ? '✓ both in' : 'writing…'}</div></div>`;
+        }).join('')}</div>
+        <div class="waiting-avatars" style="margin-top:20px">${ps.map(([pid, p]) => {
+          const m = (c.rounds[c.round] || []).find(m2 => m2.a === pid || m2.b === pid);
+          const doneW = m && (m.a === pid ? m.capA : m.capB);
+          return `<div class="wa${doneW ? ' done' : ''}"><img src="${p.avatar}" alt=""></div>`;
+        }).join('')}</div>`;
+    }
+    const allIn = c.finale
+      ? ps.every(([pid]) => (c.finaleCaps || {})[pid])
+      : c.rounds[c.round].every(m => m.capA && (m.b === 'HOUSE' || m.capB));
+    if (allIn && once('capAllIn:' + key)) { clearCapTimer(); VOICE.say('vo_votes_locked'); capWriteDone(); }
+  }
+
+  function capWriteDone() {
+    const c = room.caption;
+    if (c.finale) {
+      const caps = { ...(c.finaleCaps || {}) };
+      let h = 0;
+      while (Object.keys(caps).length < 4) caps['HOUSE' + (h || '')] = houseCap(), h++;
+      R().update({ 'caption/finaleCaps': caps, 'caption/finaleVotes': null, state: 'capVote' });
+    } else {
+      // missing captions stay null → shown as "(too slow 😴)"
+      R().update({ state: 'capVote', 'caption/matchupIdx': 0 });
+    }
+  }
+
+  /* ---- vote phase ---- */
+  function renderCapVoteTV() {
+    const c = room.caption;
+    if (c.finale) return renderCapFinaleVoteTV();
+    const m = c.rounds[c.round][c.matchupIdx];
+    const votes = m.votes || {};
+    const vk = `capV:${c.round}:${c.matchupIdx}`;
+    if (capVoteKey !== vk) {
+      capVoteKey = vk;
+      renderCapVoteTV._prev = 0;
+      if (once('snd:' + vk)) SFX.play('whoosh');
+      const capL = m.flip ? m.capB : m.capA, capR = m.flip ? m.capA : m.capB;
+      stage().innerHTML = `
+        ${capScoreStrip()}
+        <div class="tv-caption">😂 Who did it better<span class="accent">?</span></div>
+        <div class="cap-prompt">${esc(m.prompt)}</div>
+        <div class="cap-stage">
+          <div class="cap-photo"><img src="${m.photo}" alt=""></div>
+          <div class="cap-opts">
+            <div class="cap-opt">${esc(capL || '(too slow 😴)')}</div>
+            <div class="cap-opt">${esc(capR || '(too slow 😴)')}</div>
+          </div>
+        </div>
+        <div class="tv-sub">Vote on your phones — no names attached 👀</div>
+        <div class="sd-voters" id="capVoters"></div>`;
+    }
+    const w = $('#capVoters'); w.innerHTML = '';
+    const eligible = players().filter(([pid]) => pid !== m.a && pid !== m.b);
+    let lc = 0;
+    eligible.forEach(([pid, p]) => {
+      const doneV = votes[pid] != null; if (doneV) lc++;
+      w.appendChild(el('div', 'wa' + (doneV ? ' done' : ''), `<img src="${p.avatar}" alt="">`));
+    });
+    if (lc > (renderCapVoteTV._prev || 0)) SFX.play('lock');
+    renderCapVoteTV._prev = lc;
+    if (eligible.every(([pid]) => votes[pid] != null) && once('capAllVotes:' + vk)) {
+      R().update({ state: 'capReveal' });
+    }
+  }
+
+  function renderCapFinaleVoteTV() {
+    const c = room.caption;
+    const caps = Object.entries(c.finaleCaps || {});
+    const votes = c.finaleVotes || {};
+    const vk = 'capVF';
+    if (capVoteKey !== vk) {
+      capVoteKey = vk;
+      renderCapVoteTV._prev = 0;
+      if (once('snd:' + vk)) SFX.play('whoosh');
+      stage().innerHTML = `
+        ${capScoreStrip()}
+        <div class="tv-caption">😂 The Ick — vote<span class="accent">!</span></div>
+        <div class="cap-prompt">${esc(c.finalePrompt || CAP_ICK[0])}</div>
+        <div class="cap-stage">
+          <div class="cap-photo"><img src="${c.finalePhoto}" alt=""></div>
+          <div class="cap-opts">${caps.map(([k, t]) => `<div class="cap-opt">${esc(t)}</div>`).join('')}</div>
+        </div>
+        <div class="tv-sub">Phones: pick the funniest (not your own) 👀</div>
+        <div class="sd-voters" id="capVoters"></div>`;
+    }
+    const w = $('#capVoters'); w.innerHTML = '';
+    let lc = 0;
+    players().forEach(([pid, p]) => {
+      const doneV = votes[pid] != null; if (doneV) lc++;
+      w.appendChild(el('div', 'wa' + (doneV ? ' done' : ''), `<img src="${p.avatar}" alt="">`));
+    });
+    if (lc > (renderCapVoteTV._prev || 0)) SFX.play('lock');
+    renderCapVoteTV._prev = lc;
+    if (players().length && players().every(([pid]) => votes[pid] != null) && once('capAllVotesF')) {
+      R().update({ state: 'capReveal' });
+    }
+  }
+
+  /* ---- reveal ---- */
+  async function playCapReveal() {
+    const c = room.caption;
+    if (c.finale) return playCapFinaleReveal();
+    const m = c.rounds[c.round][c.matchupIdx];
+    const votes = m.votes || {};
+    const capFor2 = s => s === 'A' ? m.capA : m.capB;
+    const pidFor = s => s === 'A' ? m.a : m.b;
+    const sideL = m.flip ? 'B' : 'A', sideR = m.flip ? 'A' : 'B';
+    const lC = Object.values(votes).filter(v => v === 0).length;
+    const rC = Object.values(votes).filter(v => v === 1).length;
+    stage().innerHTML = `
+      ${capScoreStrip()}
+      <div class="cap-prompt">${esc(m.prompt)}</div>
+      <div class="cap-stage">
+        <div class="cap-photo"><img src="${m.photo}" alt=""></div>
+        <div class="cap-opts">
+          <div class="cap-opt" id="capL">${esc(capFor2(sideL) || '(too slow 😴)')}<div class="votes" id="capVL">${lC}</div></div>
+          <div class="cap-opt" id="capR">${esc(capFor2(sideR) || '(too slow 😴)')}<div class="votes" id="capVR">${rC}</div></div>
+        </div>
+      </div>
+      <div class="tv-sub" id="capSub"></div>`;
+    await sleep(800);
+    $('#capVL').classList.add('on'); SFX.play('stamp');
+    await sleep(500);
+    $('#capVR').classList.add('on'); SFX.play('stamp');
+    await sleep(800);
+    const winner = lC === rC ? null : (lC > rC ? sideL : sideR);
+    if (winner) {
+      $('#cap' + (winner === sideL ? 'L' : 'R')).classList.add('winner');
+      $('#cap' + (winner === sideL ? 'R' : 'L')).classList.add('loser');
+      SFX.play('win');
+    }
+    const stamp = (sel, pid2) => {
+      if (pid2 === 'HOUSE') $(sel).appendChild(el('div', 'owner', `<span>🏠 The House</span>`));
+      else { const p2 = room.players[pid2]; $(sel).appendChild(el('div', 'owner', `${pav(p2.avatar)}<span>${esc(p2.name)}</span>`)); }
+    };
+    stamp('#capL', pidFor(sideL)); SFX.play('stamp');
+    await sleep(650);
+    stamp('#capR', pidFor(sideR)); SFX.play('stamp');
+    await sleep(900);
+    const u = {};
+    const sweep = winner && Math.min(lC, rC) === 0 && (lC + rC) >= 2;
+    const winPid = winner ? pidFor(winner) : null;
+    if (sweep) { megaSplash('UNANIMOUS!'); SFX.play('fanfare'); confettiBurst(50); VOICE.say('vo_unanimous'); }
+    else if (winPid === 'HOUSE') VOICE.say('vo_upset');
+    if (winner && winPid !== 'HOUSE') {
+      const pts = (winner === sideL ? lC : rC) * 100 + (sweep ? 250 : 0);
+      u[`caption/scores/${winPid}`] = ((c.scores || {})[winPid] || 0) + pts;
+      const winVotes = winner === sideL ? lC : rC;
+      if (winVotes > ((c.best || {}).votes || 0)) u['caption/best'] = { text: capFor2(winner), votes: winVotes, pid: winPid, photo: m.photo };
+    }
+    $('#capSub').innerHTML = winner
+      ? (winPid === 'HOUSE' ? `🏠 <b style="color:var(--gold)">The House</b> takes it. Shame on all of you.`
+         : `<b style="color:var(--gold)">${esc(room.players[winPid].name)}</b> takes it${sweep ? ' — unanimous, +250!' : '!'}`)
+      : `A tie — no points. The room is deadlocked.`;
+    await sleep(sweep ? 2800 : 2400);
+    await R().update(u);
+    const nextM = c.matchupIdx + 1;
+    if (nextM < c.rounds[c.round].length) R().update({ state: 'capVote', 'caption/matchupIdx': nextM });
+    else if (c.round + 1 < CAP_ROUNDS) R().update({ state: 'capWrite', 'caption/round': c.round + 1, 'caption/matchupIdx': 0 });
+    else R().update({ state: 'capWrite', 'caption/finale': true, 'caption/finalePrompt': CAP_ICK[Math.floor(Math.random() * CAP_ICK.length)] });
+  }
+
+  async function playCapFinaleReveal() {
+    const c = room.caption;
+    const caps = c.finaleCaps || {}, votes = c.finaleVotes || {};
+    const entries = Object.entries(caps).map(([k, text]) => ({ k, text, n: Object.values(votes).filter(v => v === k).length }))
+      .sort((x, y) => y.n - x.n);
+    stage().innerHTML = `
+      ${capScoreStrip()}
+      <div class="tv-caption">😂 The Ick — results<span class="accent">!</span></div>
+      <div class="cap-opts" style="gap:12px;align-items:stretch" id="capEntries">
+        ${entries.map((e2, i) => `<div class="cap-entry${i === 0 ? ' first' : ''}" style="animation-delay:${i * .35}s">
+          <div class="cap-vc">${e2.n}</div><div class="cap-txt">${esc(e2.text)}</div><div class="cap-who"></div></div>`).join('')}
+      </div>
+      <div class="tv-sub"></div>`;
+    await sleep(500);
+    const whos = document.querySelectorAll('#capEntries .cap-who');
+    for (let i = 0; i < entries.length; i++) {
+      const e2 = entries[i];
+      if (whos[i]) {
+        if (e2.k.startsWith('HOUSE')) whos[i].innerHTML = `<span style="font-weight:800">🏠</span>`;
+        else { const p2 = room.players[e2.k]; if (p2) whos[i].innerHTML = pav(p2.avatar); }
+      }
+      if (i % 2 === 0) SFX.play('stamp');
+      await sleep(350);
+    }
+    const u = {};
+    entries.forEach(e2 => { if (!e2.k.startsWith('HOUSE') && e2.n) u[`caption/scores/${e2.k}`] = ((c.scores || {})[e2.k] || 0) + e2.n * 200; });
+    const top = entries.find(e2 => !e2.k.startsWith('HOUSE') && e2.n > 0);
+    if (top && top.n > ((c.best || {}).votes || 0)) u['caption/best'] = { text: top.text, votes: top.n, pid: top.k, photo: c.finalePhoto };
+    await sleep(2400);
+    u['state'] = 'capFinal';
+    await R().update(u);
+  }
+
+  /* ---- podium ---- */
+  function renderCapFinal() {
+    const c = room.caption;
+    const ranked = players().map(([pid, p]) => [pid, p, (c.scores || {})[pid] || 0]).sort((a, b) => b[2] - a[2]);
+    confettiBurst(140);
+    SFX.play('fanfare');
+    VOICE.say('vo_showcase');
+    const pods = ranked.map(([pid, p, sc], i) => `
+      <div class="sd-pod card${i === 0 ? ' first' : ''}" style="animation-delay:${i * .15}s">
+        ${i === 0 ? '<div class="crown">👑</div>' : ''}
+        ${pav(p.avatar)}<b>${esc(p.name)}</b><span class="pts">${sc} pt${sc === 1 ? '' : 's'}</span>
+      </div>`).join('');
+    const best = c.best;
+    const bestCard = best ? `
+      <div class="award-card card" style="margin-top:26px;animation-delay:.6s"><div class="award-emoji">🏆</div>
+        <div class="award-photo"><img src="${best.photo}" alt=""></div>
+        <h3>Caption of the Night</h3>
+        <p style="font-size:15px;color:var(--cream)">“${esc(best.text)}”</p>
+        <div class="award-name">${esc(room.players[best.pid].name)} · ${best.votes} vote${best.votes === 1 ? '' : 's'}</div></div>` : '';
+    stage().innerHTML = `
+      <div class="awards-scroll"><div class="awards-inner">
+        <div class="tv-caption">😂 Funniest person alive<span class="accent">!</span></div>
+        <div class="tv-sub" style="margin:0 0 20px"><b style="color:var(--gold);font-size:1.3em">${esc(ranked[0][1].name)}</b> is officially the funniest.</div>
+        <div class="sd-podium">${pods}</div>
+        ${bestCard}
+        <div class="tv-sub" style="margin-top:26px"><button class="btn ghost" id="capAgainBtn">🔁 New game</button></div>
+      </div></div>`;
+    $('#capAgainBtn').onclick = async () => { await db.ref('rooms/' + code).remove(); sessionStorage.removeItem('ht_tv'); location.reload(); };
+  }
+
   return { init };
 })();
 
@@ -2246,9 +2666,25 @@ const Player = (() => {
     const sd = room.showdown || {}, d = sd.duel || {};
     const key = [room.state, room.round, room.phase, room.turnIdx, b.num, b.pick != null, !!myVote(),
       b.predictions && b.predictions[pid] != null,
-      sd.duelIdx, d.rematch, !!(sd.kept && sd.kept[pid]), !!(d.cards && d.cards[pid]), d.votes && d.votes[pid] != null].join('|');
+      sd.duelIdx, d.rematch, !!(sd.kept && sd.kept[pid]), !!(d.cards && d.cards[pid]), d.votes && d.votes[pid] != null,
+      (room.caption || {}).round, (room.caption || {}).matchupIdx, !!(room.caption || {}).finale, capSelfKey()].join('|');
     if (key === lastKey) return;
     lastKey = key;
+    // caption-mode self status for the dedupe key
+    function capSelfKey() {
+      const c = room.caption || {};
+      if (room.state === 'capWrite') {
+        if (c.finale) return (c.finaleCaps || {})[pid] ? 1 : 0;
+        const m = ((c.rounds || [])[c.round] || []).find(m2 => m2.a === pid || m2.b === pid);
+        return m ? ((m.a === pid ? m.capA : m.capB) ? 1 : 0) : 'x';
+      }
+      if (room.state === 'capVote') {
+        if (c.finale) return (c.finaleVotes || {})[pid] != null ? 1 : 0;
+        const m = (((c.rounds || [])[c.round]) || [])[c.matchupIdx] || {};
+        return (m.votes || {})[pid] != null ? 1 : 0;
+      }
+      return 0;
+    }
     const st = room.state;
     if (st === 'lobby') renderLobby();
     else if (st === 'vote') renderVote();
@@ -2263,6 +2699,10 @@ const Player = (() => {
     else if (st === 'sdVote') renderSdVotePhone();
     else if (st === 'sdReveal') renderSdRevealPhone();
     else if (st === 'sdFinal') renderSdFinalPhone();
+    else if (st === 'capWrite') renderCapWrite();
+    else if (st === 'capVote') renderCapVote();
+    else if (st === 'capReveal') stage().innerHTML = waitingCard('🥁', 'Verdict on the TV!', 'Watch who wrote what…');
+    else if (st === 'capFinal') renderCapFinalPhone();
   }
 
   function renderAwardsWatch() {
@@ -2627,6 +3067,84 @@ const Player = (() => {
       <div class="status-card card">
       <h3>${champ ? 'You know the room!' : 'Showdown over'}</h3>
       <p>You finished with <b style="color:var(--gold)">${myScore} point${myScore === 1 ? '' : 's'}</b>${champ ? ' — champion!' : '.'}</p></div>`;
+  }
+
+
+  /* ================ CAPTION — She's a 10 but… (phone) ================ */
+  const waitingCard = (emoji, h3, p2) => `<div class="big-emoji">${emoji}</div>
+    <div class="status-card card"><h3>${h3}</h3><p>${p2}</p></div>`;
+
+  function captionForm(photo, prompt, onSubmit) {
+    stage().innerHTML = `
+      <div class="phone-title" style="color:var(--rose)">😂 Be funny</div>
+      <div class="cap-mini"><img src="${photo}" alt=""></div>
+      <div class="phone-sub" style="margin-bottom:12px">${esc(prompt)}</div>
+      <textarea class="cap-ta" id="capTa" maxlength="80" placeholder="your caption… (80 chars)"></textarea>
+      <button class="btn big" id="capGo" style="width:100%;margin-top:12px" disabled>Submit ▶</button>`;
+    const ta = $('#capTa'), btn = $('#capGo');
+    ta.oninput = () => { btn.disabled = !ta.value.trim(); };
+    btn.onclick = () => { const t = ta.value.trim(); if (t) { btn.disabled = true; onSubmit(t); } };
+  }
+
+  function renderCapWrite() {
+    const c = room.caption;
+    if (c.finale) {
+      if ((c.finaleCaps || {})[pid]) { stage().innerHTML = waitingCard('🤫', 'Caption in!', 'Waiting for the slow writers…'); return; }
+      captionForm(c.finalePhoto, c.finalePrompt || CAP_ICK[0], t => R().child(`caption/finaleCaps/${pid}`).set(t));
+      return;
+    }
+    const ms = (c.rounds || [])[c.round] || [];
+    const mi = ms.findIndex(m2 => m2.a === pid || m2.b === pid);
+    if (mi < 0) { stage().innerHTML = waitingCard('🍿', 'Sit this one out', 'Watch the TV — the room is writing.'); return; }
+    const m = ms[mi], mine = m.a === pid ? 'capA' : 'capB';
+    if (m[mine]) { stage().innerHTML = waitingCard('🤫', 'Caption in!', 'Waiting for the slow writers…'); return; }
+    captionForm(m.photo, m.prompt, t => R().child(`caption/rounds/${c.round}/${mi}/${mine}`).set(t));
+  }
+
+  function renderCapVote() {
+    const c = room.caption;
+    if (c.finale) {
+      if ((c.finaleVotes || {})[pid] != null) { stage().innerHTML = waitingCard('🗳️', 'Vote cast', 'Waiting for the rest…'); return; }
+      const mine = Object.entries(c.finaleCaps || {}).filter(([k]) => k !== pid);
+      stage().innerHTML = `
+        <div class="phone-title" style="color:var(--rose)">😂 Pick the funniest</div>
+        <div class="phone-sub">Not your own — nice try.</div>
+        <div style="margin-top:8px">${mine.map(([k, t]) => `<button class="cap-pick" data-k="${esc(k)}">${esc(t)}</button>`).join('')}</div>`;
+      stage().querySelectorAll('.cap-pick').forEach(b2 => b2.onclick = () => {
+        if (((room.caption || {}).finaleVotes || {})[pid] != null) return;
+        b2.classList.add('chosen');
+        R().child('caption/finaleVotes/' + pid).set(b2.dataset.k);
+      });
+      return;
+    }
+    const m = (((c.rounds || [])[c.round]) || [])[c.matchupIdx] || {};
+    if (pid === m.a || pid === m.b) { stage().innerHTML = waitingCard('😰', 'Your caption is up!', 'The room is judging. Sweat it out.'); return; }
+    if ((m.votes || {})[pid] != null) { stage().innerHTML = waitingCard('🗳️', 'Vote cast', 'Waiting for the rest of the jury…'); return; }
+    const capL = m.flip ? m.capB : m.capA, capR = m.flip ? m.capA : m.capB;
+    stage().innerHTML = `
+      <div class="phone-title" style="color:var(--rose)">😂 Who did it better?</div>
+      <div class="cap-mini"><img src="${m.photo}" alt=""></div>
+      <div class="phone-sub" style="margin-bottom:8px">${esc(m.prompt)}</div>
+      <button class="cap-pick" data-i="0">${esc(capL || '(too slow 😴)')}</button>
+      <div class="or-divider">— or —</div>
+      <button class="cap-pick" data-i="1">${esc(capR || '(too slow 😴)')}</button>`;
+    stage().querySelectorAll('.cap-pick').forEach(b2 => b2.onclick = () => {
+      const c2 = room.caption, m2 = (((c2.rounds || [])[c2.round]) || [])[c2.matchupIdx] || {};
+      if ((m2.votes || {})[pid] != null) return;
+      b2.classList.add('chosen');
+      R().child(`caption/rounds/${c2.round}/${c2.matchupIdx}/votes/${pid}`).set(+b2.dataset.i);
+    });
+  }
+
+  function renderCapFinalPhone() {
+    const c = room.caption;
+    const myScore = (c.scores || {})[pid] || 0;
+    const ranked = Object.entries(c.scores || {}).sort((a, b) => b[1] - a[1]);
+    const champ = ranked[0] && ranked[0][0] === pid;
+    stage().innerHTML = `<div class="big-emoji">${champ ? '👑' : '😂'}</div>
+      <div class="status-card card">
+      <h3>${champ ? 'Funniest person alive!' : 'Game over'}</h3>
+      <p>You finished with <b style="color:var(--gold)">${myScore} point${myScore === 1 ? '' : 's'}</b>${champ ? ' — comedy champion!' : '.'}</p></div>`;
   }
 
   /* ---- shareable recap card (canvas → PNG) ---- */
