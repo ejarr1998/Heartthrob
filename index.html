@@ -949,6 +949,16 @@ const VOICE = (() => {
   let q = [];
   const MAX_Q = 4, STALE_MS = 10000;
 
+  /* anti-repeat: remember what actually played so lines don't grate.
+     recent — rolling window of the last few lines; any()/pickFresh() avoid
+              everything in it, so 2-3 option pools cycle instead of landing
+              on the same line twice in a row.
+     played — per-line play counts. say(name, { throttle: p }): the FIRST play
+              always goes through, repeats only with probability p. */
+  const played = {};
+  let recent = [];
+  const RECENT_MAX = 6;
+
   function get(name) {
     if (!cache[name]) {
       const a = new Audio('voice/' + name + '.mp3');
@@ -964,6 +974,9 @@ const VOICE = (() => {
       if (item.staleAfter && Date.now() > item.staleAfter) continue;   // missed its moment
       const a = get(item.name);
       current = a;
+      played[item.name] = (played[item.name] || 0) + 1;
+      recent.push(item.name);
+      if (recent.length > RECENT_MAX) recent.shift();
       SFX.setDucked(true);
       const fin = () => { if (current === a) { current = null; SFX.setDucked(false); pump(); } };
       a.onended = fin;
@@ -973,13 +986,23 @@ const VOICE = (() => {
     }
     SFX.setDucked(false);
   }
-  function say(name) {
+  function say(name, opt) {
     if (SFX.isMuted()) return;
+    const thr = opt && opt.throttle;
+    if (thr != null && (played[name] || 0) > 0 && Math.random() > thr) return;   // repeat-throttle: first play free, repeats scarce
     if (q.length >= MAX_Q) return;
     q.push({ name, staleAfter: Date.now() + STALE_MS });
     pump();
   }
-  function any(names) { say(names[Math.floor(Math.random() * names.length)]); }
+  function pickFresh(names) {
+    const exclude = recent.slice(-(names.length - 1));   // only exclude the last N-1 plays — a pool always keeps a fresh option
+    const fresh = names.filter(n => !exclude.includes(n));
+    const pool = fresh.length ? fresh : names;
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+  function any(names) { say(pickFresh(names)); }
+  function times(name) { return played[name] || 0; }
+  function resetSession() { for (const k in played) delete played[k]; recent = []; }
   function seq(names) {
     if (SFX.isMuted() || !names.length) return;
     q = names.map(name => ({ name, staleAfter: 0 }));
@@ -993,7 +1016,7 @@ const VOICE = (() => {
   // custom packs — files staged; per-line triggers wired once specified
   const PACKS = { gabe: ['gabeone', 'gabetwo', 'gabethree', 'gabefour', 'gabefive'],
                   mark: ['markone', 'marktwo', 'markthree', 'markfour', 'markfive'] };
-  return { say, any, seq, stop, PACKS };
+  return { say, any, seq, stop, pickFresh, times, resetSession, PACKS };
 })();
 
 /* ---------------- router ---------------- */
@@ -1515,7 +1538,7 @@ const TV = (() => {
     const wantHB = st === 'sdDuel' && room.showdown && room.showdown.duel && room.showdown.duel.rematch;
     if (wantHB && !hbTimer) hbTimer = setInterval(() => SFX.play('heart'), 1150);
     if (!wantHB && hbTimer) { clearInterval(hbTimer); hbTimer = null; }
-    if (st === 'lobby') renderLobby();
+    if (st === 'lobby') { VOICE.resetSession(); renderLobby(); }   // fresh anti-repeat history each game
     else if (st === 'vote') renderVote();
     else if (st === 'reveal') { if (once('reveal:' + room.round)) playReveal(); }
     else if (st === 'turnIntro') renderIntro();
@@ -1611,7 +1634,7 @@ const TV = (() => {
     const votes = (room.votes && room.votes[r]) || {};
     if (voteScreenRound !== r || !$('#tvGrid')) {
       voteScreenRound = r; prevLockCount = 0;
-      if (once('vo_round:' + r)) VOICE.say(r === 9 ? 'vo_final_round' : ['vo_round_1', 'vo_round_2', 'vo_round_3'][Math.floor(Math.random() * 3)]);
+      if (once('vo_round:' + r)) VOICE.say(r === 9 ? 'vo_final_round' : VOICE.pickFresh(['vo_round_1', 'vo_round_2', 'vo_round_3']));
       stage().innerHTML = `
         <div class="tv-split">
           <div class="tv-main"><div class="grid2" id="tvGrid"></div></div>
@@ -1628,7 +1651,7 @@ const TV = (() => {
     }
     const lockCount = ps.filter(([pid]) => votes[pid]).length;
     if (lockCount > prevLockCount) SFX.play('lock');
-    if (lockCount === ps.length && ps.length > 0 && once('vo_locked:' + r)) VOICE.say('vo_votes_locked');
+    if (lockCount === ps.length && ps.length > 0 && once('vo_locked:' + r)) VOICE.say('vo_votes_locked', { throttle: .4 });
     prevLockCount = lockCount;
     const w = $('#waitRow'); w.innerHTML = '';
     ps.forEach(([pid, p]) => w.appendChild(el('div', 'wa' + (votes[pid] ? ' done' : ''), `<img src="${p.avatar}" alt="">`)));
@@ -2089,10 +2112,10 @@ const TV = (() => {
     if (once('snd:' + key)) {
       const inDuel = pack => { const t = taggedPid(pack); return t && (d.a === t || d.b === t); };
       if (d.finale && !d.rematch) { megaSplash('GRAND FINALE!'); SFX.play('fanfare'); confettiBurst(40); VOICE.say('vo_sd_finale'); }
-      else if (d.rematch) { SFX.play('vs'); VOICE.say(inDuel('mark') ? 'markfour' : 'vo_sd_sudden'); }
+      else if (d.rematch) { SFX.play('vs'); if (inDuel('mark')) VOICE.say('markfour'); else VOICE.say('vo_sd_sudden', { throttle: .5 }); }
       else {
         SFX.play('vs');
-        if (inDuel('gabe') && Math.random() < .6) VOICE.say('gabetwo');
+        if (inDuel('gabe') && Math.random() < .6) VOICE.say('gabetwo', { throttle: .5 });
         // second markfour trigger: 30% random drop-in when Mark is dueling — max once per game
         else if (inDuel('mark') && Math.random() < .3 && once('markfour:duel')) VOICE.say('markfour');
         else VOICE.any(['vo_sd_duel_1', 'vo_sd_duel_2', 'vo_sd_duel_3']);
@@ -2126,7 +2149,7 @@ const TV = (() => {
     if (sdVoteKey !== vk || !$('#sdVoters')) {
       sdVoteKey = vk;
       renderSdVoteTV._prev = 0;
-      if (once('snd:' + vk)) { SFX.play('whoosh'); VOICE.say('vo_sd_cards_in'); }
+      if (once('snd:' + vk)) { SFX.play('whoosh'); VOICE.say('vo_sd_cards_in', { throttle: .35 }); }   // every duel gets old fast
       const taunts = d.taunts || {};
       stage().innerHTML = `
         ${scoreStrip()}
@@ -2198,7 +2221,7 @@ const TV = (() => {
 
     if (lCount === rCount) {
       // tie → sudden death if both still have cards, else coin flip
-      megaSplash('TIE!', true); SFX.play('vs'); VOICE.say('vo_sd_tie');
+      megaSplash('TIE!', true); SFX.play('vs'); VOICE.say('vo_sd_tie', { throttle: .5 });
       const hasCards = p2 => {
         if (d.finale) return true;   // finale revives empty hands
         const kept = ((sd.kept || {})[p2]) || [];
@@ -2240,8 +2263,8 @@ const TV = (() => {
       u[`showdown/sweeps/${winner}`] = ((sd.sweeps || {})[winner] || 0) + 1;
     }
     if (vpackOf(winner) === 'gabe') voq.push('gabefour');
-    if (vpackOf(loser) === 'mark') voq.push(sdLosses[loser] === 3 ? 'markfive' : 'markthree');
-    if (!voq.length) voq.push(['vo_win_1', 'vo_win_2', 'vo_win_3'][Math.floor(Math.random() * 3)]);
+    if (vpackOf(loser) === 'mark') { if (sdLosses[loser] === 3) voq.push('markfive'); else if (!VOICE.times('markthree') || Math.random() < .5) voq.push('markthree'); }
+    if (!voq.length) voq.push(VOICE.pickFresh(['vo_win_1', 'vo_win_2', 'vo_win_3']));
     VOICE.seq(voq);
     $('#sdSub').innerHTML = `<b style="color:var(--gold)">${esc(room.players[winner].name)}</b> takes it${d.finale ? ' — and the finale!' : sweep ? ' — unanimous, bonus point!' : '!'}`;
     u[`showdown/scores/${winner}`] = ((sd.scores || {})[winner] || 0) + pts;
@@ -2335,7 +2358,7 @@ const TV = (() => {
         t.textContent = '⏱ ' + left + 's';
         if (left <= 0) { clearCapTimer(); capWriteDone(); }
       }, 500);
-      VOICE.say(c.finale ? 'vo_final_round' : ['vo_round_1', 'vo_round_2', 'vo_round_3'][Math.floor(Math.random() * 3)]);
+      VOICE.say(c.finale ? 'vo_final_round' : VOICE.pickFresh(['vo_round_1', 'vo_round_2', 'vo_round_3']));
     }
     if (c.finale) {
       const caps = c.finaleCaps || {};
@@ -2367,7 +2390,7 @@ const TV = (() => {
     const allIn = c.finale
       ? ps.every(([pid]) => (c.finaleCaps || {})[pid])
       : c.rounds[c.round].every(m => m.capA && (m.b === 'HOUSE' || m.capB));
-    if (allIn && once('capAllIn:' + key)) { clearCapTimer(); VOICE.say('vo_votes_locked'); capWriteDone(); }
+    if (allIn && once('capAllIn:' + key)) { clearCapTimer(); VOICE.say('vo_votes_locked', { throttle: .4 }); capWriteDone(); }
   }
 
   function capWriteDone() {
