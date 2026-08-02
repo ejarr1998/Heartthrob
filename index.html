@@ -585,6 +585,14 @@ input[type=text]::placeholder{color:#6E5CA8;font-weight:600}
 .cap-mini{width:min(60vw,240px);aspect-ratio:1/1;border-radius:16px;overflow:hidden;border:3px solid var(--line);margin:0 auto 12px}
 .cap-mini img{width:100%;height:100%;object-fit:cover}
 
+/* studio — active lobbies admin */
+.room-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--ink3);border:1px solid var(--line);border-radius:14px;padding:12px 16px;margin-top:10px}
+.room-code{font-family:'Bungee';font-size:20px;color:var(--gold);letter-spacing:.12em}
+.room-badge{font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.08em;background:var(--ink);border:1px solid var(--line);border-radius:999px;padding:3px 10px;color:var(--teal)}
+.room-meta{flex:1;min-width:180px;font-weight:700;font-size:14px;color:var(--cream)}
+.room-meta .sub{color:var(--muted);font-size:12.5px;margin-top:3px}
+.room-row .btn{padding:9px 14px;min-width:44px}
+
 /* config missing */
 #configGate{position:fixed;inset:0;z-index:200;background:var(--ink);display:none;align-items:center;justify-content:center;padding:24px}
 #configGate.on{display:flex}
@@ -693,6 +701,17 @@ input[type=text]::placeholder{color:#6E5CA8;font-weight:600}
   <div class="studio-head">
     <h1>🎬 Photo Studio</h1>
     <a class="host-link" href="#" style="margin:0">← Back to game</a>
+  </div>
+
+  <div class="studio-section card" style="padding:20px">
+    <h2>🎛 Active lobbies</h2>
+    <p class="hint">Every TV that opens creates a lobby — they pile up. Ending one kicks its players back to the join screen and resets its TV to a fresh room with a new code. This list is live.</p>
+    <div class="rounds-toolbar" style="margin-bottom:4px">
+      <span class="hint" id="roomsStatus" style="margin:0">connecting…</span>
+      <span class="tb-sep"></span>
+      <button class="btn ghost danger-ghost" id="roomsEndAll">🗑 End all lobbies</button>
+    </div>
+    <div id="roomsList"></div>
   </div>
 
   <div class="studio-section card" style="padding:20px">
@@ -1168,6 +1187,48 @@ const Studio = (() => {
     $('#delPresetBtn').onclick = deletePreset;
     $('#vtLoad').onclick = vtLoadRoom;
     $('#vtCode').addEventListener('keydown', e => { if (e.key === 'Enter') vtLoadRoom(); });
+    initRoomsAdmin();
+  }
+
+  /* ---- active lobbies: live list of every room, with kill switches ---- */
+  const fmtAge = ms => {
+    const m = Math.floor(ms / 60000);
+    if (m < 1) return 'just now';
+    if (m < 60) return m + 'm ago';
+    return Math.floor(m / 60) + 'h ' + (m % 60) + 'm ago';
+  };
+  function initRoomsAdmin() {
+    db.ref('rooms').on('value', s => {
+      const rooms = s.val() || {};
+      const entries = Object.entries(rooms).sort((a, b) => (b[1].createdAt || 0) - (a[1].createdAt || 0));
+      $('#roomsStatus').textContent = entries.length ? entries.length + ' live' : 'none right now';
+      $('#roomsEndAll').style.display = entries.length ? '' : 'none';
+      const list = $('#roomsList'); list.innerHTML = '';
+      entries.forEach(([rc, r]) => {
+        const ps = Object.entries(r.players || {}).sort((a, b) => (a[1].order || 0) - (b[1].order || 0)).map(([, p]) => p);
+        const mode = r.mode === 'caption' ? '😂 caption' : r.mode === 'showdown' ? '⚔️ showdown' : '💘 classic';
+        const row = el('div', 'room-row', `
+          <span class="room-code">${rc}</span>
+          <span class="room-badge">${mode}</span>
+          <span class="room-badge">${esc(r.state || '?')}</span>
+          <div class="room-meta">${ps.length ? ps.map(p => esc(p.name || '?')).join(' · ') : '<i>no players</i>'}
+            <div class="sub">${ps.length} player${ps.length === 1 ? '' : 's'} · opened ${r.createdAt ? fmtAge(Date.now() - r.createdAt) : '?'}</div></div>
+          <button class="btn ghost" data-vt title="Load into Voice tags">🎙</button>
+          <button class="btn ghost danger-ghost" data-end>End</button>`);
+        row.querySelector('[data-end]').onclick = async () => {
+          if (!confirm(`End lobby ${rc}? Its players get kicked and its TV resets to a fresh room.`)) return;
+          await db.ref('rooms/' + rc).remove();
+          toast(`Lobby ${rc} ended`);
+        };
+        row.querySelector('[data-vt]').onclick = () => { $('#vtCode').value = rc; vtLoadRoom(); window.scrollTo(0, document.body.scrollHeight); };
+        list.appendChild(row);
+      });
+    });
+    $('#roomsEndAll').onclick = async () => {
+      if (!confirm('End ALL lobbies? Every player gets kicked and every TV resets.')) return;
+      await db.ref('rooms').remove();
+      toast('All lobbies ended');
+    };
   }
 
   /* ---- voice tags: secretly assign custom voice packs to live players ---- */
@@ -1465,7 +1526,11 @@ const TV = (() => {
       sessionStorage.removeItem('ht_tv');
       location.reload();
     };
-    db.ref('rooms/' + code).on('value', s => { room = s.val(); if (room) render(); });
+    db.ref('rooms/' + code).on('value', s => {
+      room = s.val();
+      if (room) render();
+      else { sessionStorage.removeItem('ht_tv'); location.reload(); }   // lobby ended from the Studio — boot a fresh room
+    });
   }
 
   const R = () => db.ref('rooms/' + code);
