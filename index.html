@@ -1987,6 +1987,8 @@ const TV = (() => {
       else {
         SFX.play('vs');
         if (inDuel('gabe') && Math.random() < .6) VOICE.say('gabetwo');
+        // second markfour trigger: 30% random drop-in when Mark is dueling — max once per game
+        else if (inDuel('mark') && Math.random() < .3 && once('markfour:duel')) VOICE.say('markfour');
         else VOICE.any(['vo_sd_duel_1', 'vo_sd_duel_2', 'vo_sd_duel_3']);
       }
     }
