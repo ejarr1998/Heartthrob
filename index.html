@@ -571,6 +571,9 @@ input[type=text]::placeholder{color:#6E5CA8;font-weight:600}
 .cap-opt.winner{border-color:var(--gold);box-shadow:0 0 0 3px rgba(255,194,75,.35),0 0 34px rgba(255,194,75,.4),var(--shadow)}
 .cap-opt.loser{opacity:.5}
 .cap-prompt{color:var(--muted);font-weight:800;font-size:clamp(18px,2.2vw,30px);margin-bottom:14px;text-align:center}
+.cap-prompt.hero{color:var(--cream);font-size:clamp(30px,4.6vw,64px);line-height:1.12;max-width:min(1500px,94vw);
+  margin-bottom:20px;text-shadow:0 4px 22px rgba(0,0,0,.55);text-wrap:balance}
+.cap-medals{font-size:13px;color:var(--muted);font-weight:800;margin-top:5px}
 .cap-timer{font-family:'Bungee';font-size:clamp(18px,2vw,28px);color:var(--gold);background:var(--ink2);border:1px solid var(--line);
   border-radius:999px;padding:8px 26px;margin-bottom:18px}
 .cap-write-grid{display:flex;flex-wrap:wrap;gap:clamp(18px,2.5vw,36px);justify-content:center;max-width:1700px;width:100%}
@@ -2533,7 +2536,7 @@ const TV = (() => {
         <div class="cap-timer" id="capTimer"></div>
         <div class="tv-sub" style="margin:0 0 14px">One photo. Everyone writes. Double points.</div>
         <div class="cap-stage"><div class="cap-photo"><img src="${c.finalePhoto}" alt=""></div>
-          <div class="cap-opts"><div class="cap-prompt">${esc(c.finalePrompt || CAP_ICK[0])}</div>
+          <div class="cap-opts"><div class="cap-prompt hero">${esc(c.finalePrompt || CAP_ICK[0])}</div>
             <div class="waiting-avatars">${ps.map(([pid, p]) => `<div class="wa${caps[pid] ? ' done' : ''}"><img src="${p.avatar}" alt=""></div>`).join('')}</div>
           </div></div>`;
     } else {
@@ -2602,7 +2605,7 @@ const TV = (() => {
         ${capScoreStrip()}
         <div class="tv-caption">😂 Who did it better<span class="accent">?</span></div>
         <div class="cap-timer" id="capTimer"></div>
-        <div class="cap-prompt">${esc(m.prompt)}</div>
+        <div class="cap-prompt hero">${esc(m.prompt)}</div>
         <div class="cap-stage">
           <div class="cap-photo"><img src="${m.photo}" alt=""></div>
           <div class="cap-opts">
@@ -2641,12 +2644,12 @@ const TV = (() => {
         ${capScoreStrip()}
         <div class="tv-caption">😂 The Ick — vote<span class="accent">!</span></div>
         <div class="cap-timer" id="capTimer"></div>
-        <div class="cap-prompt">${esc(c.finalePrompt || CAP_ICK[0])}</div>
+        <div class="cap-prompt hero">${esc(c.finalePrompt || CAP_ICK[0])}</div>
         <div class="cap-stage">
           <div class="cap-photo"><img src="${c.finalePhoto}" alt=""></div>
           <div class="cap-opts">${caps.map(([k, t]) => `<div class="cap-opt">${esc(t)}</div>`).join('')}</div>
         </div>
-        <div class="tv-sub">Phones: pick the funniest (not your own) 👀</div>
+        <div class="tv-sub">Phones: rank your top 3 — 🥇 600 pts · 🥈 400 · 🥉 200 (not your own)</div>
         <div class="sd-voters" id="capVoters"></div>`;
     }
     const w = $('#capVoters'); w.innerHTML = '';
@@ -2675,7 +2678,7 @@ const TV = (() => {
     const rC = Object.values(votes).filter(v => v === 1).length;
     stage().innerHTML = `
       ${capScoreStrip()}
-      <div class="cap-prompt">${esc(m.prompt)}</div>
+      <div class="cap-prompt hero">${esc(m.prompt)}</div>
       <div class="cap-stage">
         <div class="cap-photo"><img src="${m.photo}" alt=""></div>
         <div class="cap-opts">
@@ -2733,15 +2736,24 @@ const TV = (() => {
   async function playCapFinaleReveal() {
     const c = room.caption;
     const caps = c.finaleCaps || {}, votes = c.finaleVotes || {};
-    const entries = Object.entries(caps).map(([k, text]) => ({ k, text, n: Object.values(votes).filter(v => v === k).length }))
-      .sort((x, y) => y.n - x.n);
+    const entries = Object.entries(caps).map(([k, text]) => {
+      let w = 0, g = 0, sv = 0, bz = 0;
+      Object.values(votes).forEach(v => {
+        if (!v) return;
+        if (typeof v === 'string') { if (v === k) { w += 3; g++; } return; }   // stale pre-ballot clients: a lone vote counts as gold
+        if (v.gold === k) { w += 3; g++; }
+        if (v.silver === k) { w += 2; sv++; }
+        if (v.bronze === k) { w += 1; bz++; }
+      });
+      return { k, text, w, g, sv, bz };
+    }).sort((x, y) => y.w - x.w || y.g - x.g);
     stage().innerHTML = `
       ${capScoreStrip()}
       <div class="tv-caption">😂 The Ick — results<span class="accent">!</span></div>
       <div class="cap-mini" style="width:min(24vh,220px);margin-bottom:16px"><img src="${c.finalePhoto}" alt=""></div>
       <div class="cap-opts" style="gap:14px;align-items:stretch;width:min(1300px,94vw);flex:none" id="capEntries">
         ${entries.map((e2, i) => `<div class="cap-entry${i === 0 ? ' first' : ''}" style="animation-delay:${i * .35}s">
-          <div class="cap-vc">${e2.n}</div><div class="cap-txt">${esc(e2.text)}</div><div class="cap-who"></div></div>`).join('')}
+          <div class="cap-vc">${e2.w * 200}</div><div class="cap-txt">${esc(e2.text)}<div class="cap-medals">🥇×${e2.g} · 🥈×${e2.sv} · 🥉×${e2.bz}</div></div><div class="cap-who"></div></div>`).join('')}
       </div>
       <div class="tv-sub"></div>`;
     await sleep(500);
@@ -2756,9 +2768,9 @@ const TV = (() => {
       await sleep(350);
     }
     const u = {};
-    entries.forEach(e2 => { if (!e2.k.startsWith('HOUSE') && e2.n) u[`caption/scores/${e2.k}`] = ((c.scores || {})[e2.k] || 0) + e2.n * 200; });
-    const top = entries.find(e2 => !e2.k.startsWith('HOUSE') && e2.n > 0);
-    if (top && top.n > ((c.best || {}).votes || 0)) u['caption/best'] = { text: top.text, votes: top.n, pid: top.k, photo: c.finalePhoto };
+    entries.forEach(e2 => { if (!e2.k.startsWith('HOUSE') && e2.w) u[`caption/scores/${e2.k}`] = ((c.scores || {})[e2.k] || 0) + e2.w * 200; });
+    const top = entries.find(e2 => !e2.k.startsWith('HOUSE') && e2.w > 0);
+    if (top && top.w > ((c.best || {}).votes || 0)) u['caption/best'] = { text: top.text, votes: top.w, pid: top.k, photo: c.finalePhoto };
     await sleep(2400);
     u['state'] = 'capFinal';
     await R().update(u);
@@ -3344,19 +3356,42 @@ const Player = (() => {
                 myMs.length > 1 ? `You're in ${myMs.length} matchups — caption ${doneCt + 1} of ${myMs.length}!` : null);
   }
 
+  let finBallotKey = '', finBallot = [], finPicks = [];
   function renderCapVote() {
     const c = room.caption;
     if (c.finale) {
-      if ((c.finaleVotes || {})[pid] != null) { stage().innerHTML = waitingCard('🗳️', 'Vote cast', 'Waiting for the rest…'); return; }
-      const mine = shuffle(Object.entries(c.finaleCaps || {}).filter(([k]) => k !== pid));   // shuffled ballot — Firebase sorts keys (HOUSE first), which would bias lazy first-tappers
+      if ((c.finaleVotes || {})[pid] != null) { stage().innerHTML = waitingCard('🗳️', 'Ballot in!', 'Waiting for the rest…'); return; }
+      const capsNow = c.finaleCaps || {};
+      const bk = 'finBallot:' + Object.keys(capsNow).sort().join('|');
+      if (finBallotKey !== bk) {
+        finBallotKey = bk;
+        // shuffled ballot — Firebase sorts keys (HOUSE first), which would bias lazy first-tappers
+        finBallot = shuffle(Object.entries(capsNow).filter(([k]) => k !== pid));
+        finPicks = [];
+      }
+      finPicks = finPicks.filter(k => finBallot.some(([k2]) => k2 === k));
+      const medals = ['🥇', '🥈', '🥉'];
+      const steps = ['Tap your favorite', 'Now second place', 'Finally third place'];
+      const need = Math.min(3, finBallot.length);
       stage().innerHTML = `
-        <div class="phone-title" style="color:var(--rose)">😂 Pick the funniest</div>
-        <div class="phone-sub">Not your own — nice try.</div>
-        <div style="margin-top:8px">${mine.map(([k, t]) => `<button class="cap-pick" data-k="${esc(k)}">${esc(t)}</button>`).join('')}</div>`;
+        <div class="phone-title" style="color:var(--rose)">😂 Rank the top ${need}</div>
+        <div class="phone-sub">${steps[Math.min(finPicks.length, 2)]} — never your own.</div>
+        <div style="margin-top:8px">${finBallot.map(([k, t]) => {
+          const at = finPicks.indexOf(k);
+          return `<button class="cap-pick${at >= 0 ? ' chosen' : ''}" data-k="${esc(k)}">${at >= 0 ? medals[at] + ' ' : ''}${esc(t)}</button>`;
+        }).join('')}</div>`;
       stage().querySelectorAll('.cap-pick').forEach(b2 => b2.onclick = () => {
         if (((room.caption || {}).finaleVotes || {})[pid] != null) return;
-        b2.classList.add('chosen');
-        R().child('caption/finaleVotes/' + pid).set(b2.dataset.k);
+        const k = b2.dataset.k, at = finPicks.indexOf(k);
+        if (at >= 0) finPicks = finPicks.slice(0, at);          // tap a picked caption to undo it (and everything after)
+        else { if (finPicks.length >= need) return; finPicks.push(k); }
+        if (navigator.vibrate) navigator.vibrate(10);
+        if (finPicks.length >= need) {
+          const v = { gold: finPicks[0] };
+          if (finPicks[1]) v.silver = finPicks[1];
+          if (finPicks[2]) v.bronze = finPicks[2];
+          R().child('caption/finaleVotes/' + pid).set(v);
+        } else renderCapVote();
       });
       return;
     }
