@@ -548,32 +548,32 @@ input[type=text]::placeholder{color:#6E5CA8;font-weight:600}
 
 
 /* ================ CAPTION mode (She's a 10 but…) ================ */
-.cap-stage{display:flex;align-items:center;gap:clamp(18px,3vw,40px);justify-content:center;flex-wrap:wrap}
-.cap-photo{width:min(42vh,32vw);aspect-ratio:1/1;border-radius:20px;overflow:hidden;border:4px solid var(--line);box-shadow:var(--shadow)}
+.cap-stage{display:flex;align-items:center;gap:clamp(24px,4vw,64px);justify-content:center;width:100%;max-width:1700px}
+.cap-photo{width:min(60vh,38vw);flex:none;aspect-ratio:1/1;border-radius:20px;overflow:hidden;border:4px solid var(--line);box-shadow:var(--shadow)}
 .cap-photo img{width:100%;height:100%;object-fit:cover}
-.cap-opts{display:flex;flex-direction:column;gap:14px;width:min(520px,88vw)}
-.cap-opt{position:relative;background:var(--ink2);border:3px solid var(--line);border-radius:18px;padding:16px 20px;
-  font-weight:800;font-size:clamp(16px,1.9vw,25px);color:var(--cream);text-align:center;box-shadow:var(--shadow);
+.cap-opts{display:flex;flex-direction:column;gap:clamp(14px,2vh,26px);flex:1;min-width:0}
+.cap-opt{position:relative;background:var(--ink2);border:3px solid var(--line);border-radius:22px;padding:clamp(18px,2.6vh,34px) clamp(22px,2.2vw,44px);
+  font-weight:800;font-size:clamp(20px,2.4vw,38px);color:var(--cream);text-align:center;box-shadow:var(--shadow);
   animation:popIn .45s cubic-bezier(.2,1.6,.4,1) both}
 .cap-opt .votes{position:absolute;top:-13px;right:-10px;background:var(--gold);color:#4A3405;border-radius:999px;
   font-family:'Bungee';font-size:15px;padding:3px 11px;border:2px solid #fff;opacity:0}
 .cap-opt .votes.on{opacity:1;animation:popIn .3s both}
 .cap-opt .owner{display:inline-flex;align-items:center;gap:8px;background:rgba(12,6,30,.85);border-radius:999px;
-  padding:4px 14px 4px 4px;font-weight:800;font-size:15px;margin-top:10px;animation:popIn .45s cubic-bezier(.2,1.6,.4,1) both}
+  padding:6px 18px 6px 6px;font-weight:800;font-size:clamp(15px,1.6vw,22px);margin-top:14px;animation:popIn .45s cubic-bezier(.2,1.6,.4,1) both}
 .cap-opt .owner .pav{width:34px;height:34px;border-width:2px}
 .cap-opt.winner{border-color:var(--gold);box-shadow:0 0 0 3px rgba(255,194,75,.35),0 0 34px rgba(255,194,75,.4),var(--shadow)}
 .cap-opt.loser{opacity:.5}
-.cap-prompt{color:var(--muted);font-weight:800;font-size:clamp(14px,1.6vw,19px);margin-bottom:14px;text-align:center}
-.cap-timer{font-family:'Bungee';font-size:20px;color:var(--gold);background:var(--ink2);border:1px solid var(--line);
-  border-radius:999px;padding:6px 20px;margin-bottom:16px}
-.cap-write-grid{display:flex;flex-wrap:wrap;gap:18px;justify-content:center;max-width:1000px}
-.cap-write-item{width:150px;text-align:center}
-.cap-write-item>img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:14px;border:3px solid var(--line);display:block}
+.cap-prompt{color:var(--muted);font-weight:800;font-size:clamp(18px,2.2vw,30px);margin-bottom:14px;text-align:center}
+.cap-timer{font-family:'Bungee';font-size:clamp(18px,2vw,28px);color:var(--gold);background:var(--ink2);border:1px solid var(--line);
+  border-radius:999px;padding:8px 26px;margin-bottom:18px}
+.cap-write-grid{display:flex;flex-wrap:wrap;gap:clamp(18px,2.5vw,36px);justify-content:center;max-width:1700px;width:100%}
+.cap-write-item{width:clamp(200px,20vw,320px);text-align:center}
+.cap-write-item>img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:18px;border:4px solid var(--line);display:block;box-shadow:var(--shadow)}
 .cap-entry{display:flex;align-items:center;gap:14px;background:var(--ink2);border:2px solid var(--line);border-radius:16px;
   padding:12px 18px;animation:popIn .45s both}
 .cap-entry.first{border-color:var(--gold)}
-.cap-entry .cap-vc{font-family:'Bungee';font-size:24px;color:var(--gold);min-width:44px;text-align:center}
-.cap-entry .cap-txt{flex:1;font-weight:800;font-size:clamp(15px,1.7vw,21px);text-align:left}
+.cap-entry .cap-vc{font-family:'Bungee';font-size:clamp(24px,2.6vw,40px);color:var(--gold);min-width:64px;text-align:center}
+.cap-entry .cap-txt{flex:1;font-weight:800;font-size:clamp(18px,2.2vw,32px);text-align:left}
 .cap-entry .cap-who .pav{width:44px;height:44px;border-width:3px}
 /* caption mode — phone */
 .cap-ta{width:100%;min-height:92px;font-family:'Outfit';font-weight:700;font-size:18px;color:var(--cream);
@@ -2297,7 +2297,7 @@ const TV = (() => {
      CAPTION — She's a 10 but… (Quiplash-style)
      write captions on photos → anonymous head-to-head votes → points
   ================================================================ */
-  const CAP_ROUNDS = 3, CAP_WRITE_MS = 60000;
+  const CAP_ROUNDS = 3, CAP_WRITE_MS = 60000, CAP_VOTE_MS = 45000;
   let capTimerInt = null, capWriteDeadline = 0, capVoteKey = '';
   function clearCapTimer() { if (capTimerInt) { clearInterval(capTimerInt); capTimerInt = null; } }
 
@@ -2305,15 +2305,16 @@ const TV = (() => {
     const ps = players(), ids = ps.map(([pid]) => pid);
     const libS = await db.ref('library').once('value');
     const urls = shuffle(Object.values(libS.val() || {}).map(i => i.url));
-    const perRound = ids.length === 2 ? 2 : Math.ceil(ids.length / 2);   // 2p: each faces The House
+    const perRound = ids.length <= 3 ? ids.length : Math.ceil(ids.length / 2);   // ≤3p: everyone faces The House (keeps 2+ voters per matchup)
     const need = CAP_ROUNDS * perRound + 1;
     if (urls.length < need) { toast(`Caption game needs at least ${need} photos in the library (you have ${urls.length}).`); return; }
     let ui = 0;
     const rounds = [];
     for (let r = 0; r < CAP_ROUNDS; r++) {
       const order = shuffle(ids), prompts = shuffle(CAP_PROMPTS), ms = [];
-      if (order.length === 2) {
-        // 2 players: pairing them together leaves zero voters — each faces The House instead
+      if (order.length <= 3) {
+        // ≤3 players: pairing them together leaves 0-1 voters — everyone faces The House instead.
+        // Each player gets their OWN photo+prompt; the other players vote on every matchup.
         order.forEach(a => ms.push({ photo: urls[ui++], prompt: prompts[ms.length % prompts.length], a, b: 'HOUSE',
                   capA: null, capB: houseCap(), flip: Math.random() < .5 ? 1 : 0, votes: null }));
       } else {
@@ -2407,6 +2408,19 @@ const TV = (() => {
   }
 
   /* ---- vote phase ---- */
+  /* vote failsafe: AFK/lost-phone voters can't hang the game — after 45s, reveal with the votes that are in */
+  function armCapVoteTimer() {
+    clearCapTimer();
+    const deadline = Date.now() + CAP_VOTE_MS;
+    capTimerInt = setInterval(() => {
+      if (!room || room.state !== 'capVote') return clearCapTimer();
+      const t = $('#capTimer'); if (!t) return;
+      const left = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+      t.textContent = '⏱ ' + left + 's';
+      if (left <= 0) { clearCapTimer(); R().update({ state: 'capReveal' }); }
+    }, 500);
+  }
+
   function renderCapVoteTV() {
     const c = room.caption;
     if (c.finale) return renderCapFinaleVoteTV();
@@ -2417,10 +2431,12 @@ const TV = (() => {
       capVoteKey = vk;
       renderCapVoteTV._prev = 0;
       if (once('snd:' + vk)) SFX.play('whoosh');
+      armCapVoteTimer();
       const capL = m.flip ? m.capB : m.capA, capR = m.flip ? m.capA : m.capB;
       stage().innerHTML = `
         ${capScoreStrip()}
         <div class="tv-caption">😂 Who did it better<span class="accent">?</span></div>
+        <div class="cap-timer" id="capTimer"></div>
         <div class="cap-prompt">${esc(m.prompt)}</div>
         <div class="cap-stage">
           <div class="cap-photo"><img src="${m.photo}" alt=""></div>
@@ -2455,9 +2471,11 @@ const TV = (() => {
       capVoteKey = vk;
       renderCapVoteTV._prev = 0;
       if (once('snd:' + vk)) SFX.play('whoosh');
+      armCapVoteTimer();
       stage().innerHTML = `
         ${capScoreStrip()}
         <div class="tv-caption">😂 The Ick — vote<span class="accent">!</span></div>
+        <div class="cap-timer" id="capTimer"></div>
         <div class="cap-prompt">${esc(c.finalePrompt || CAP_ICK[0])}</div>
         <div class="cap-stage">
           <div class="cap-photo"><img src="${c.finalePhoto}" alt=""></div>
@@ -2521,18 +2539,22 @@ const TV = (() => {
     stamp('#capR', pidFor(sideR)); SFX.play('stamp');
     await sleep(900);
     const u = {};
-    const sweep = winner && Math.min(lC, rC) === 0 && (lC + rC) >= 2;
     const winPid = winner ? pidFor(winner) : null;
+    // a "(too slow 😴)" side can win the vote — no caption means no points and NO best-update
+    // (undefined text in the update payload crashes Firebase and wedges the game on this screen)
+    const winText = winner ? capFor2(winner) : null;
+    const sweep = winner && winText && Math.min(lC, rC) === 0 && (lC + rC) >= 2;
     if (sweep) { megaSplash('UNANIMOUS!'); SFX.play('fanfare'); confettiBurst(50); VOICE.say('vo_unanimous'); }
     else if (winPid === 'HOUSE') VOICE.say('vo_upset');
-    if (winner && winPid !== 'HOUSE') {
+    if (winner && winPid !== 'HOUSE' && winText) {
       const pts = (winner === sideL ? lC : rC) * 100 + (sweep ? 250 : 0);
       u[`caption/scores/${winPid}`] = ((c.scores || {})[winPid] || 0) + pts;
       const winVotes = winner === sideL ? lC : rC;
-      if (winVotes > ((c.best || {}).votes || 0)) u['caption/best'] = { text: capFor2(winner), votes: winVotes, pid: winPid, photo: m.photo };
+      if (winVotes > ((c.best || {}).votes || 0)) u['caption/best'] = { text: winText, votes: winVotes, pid: winPid, photo: m.photo };
     }
     $('#capSub').innerHTML = winner
       ? (winPid === 'HOUSE' ? `🏠 <b style="color:var(--gold)">The House</b> takes it. Shame on all of you.`
+         : !winText ? `<b style="color:var(--gold)">${esc(room.players[winPid].name)}</b> wins with… absolutely nothing. No points for ghost writers 😴`
          : `<b style="color:var(--gold)">${esc(room.players[winPid].name)}</b> takes it${sweep ? ' — unanimous, +250!' : '!'}`)
       : `A tie — no points. The room is deadlocked.`;
     await sleep(sweep ? 2800 : 2400);
@@ -2551,7 +2573,8 @@ const TV = (() => {
     stage().innerHTML = `
       ${capScoreStrip()}
       <div class="tv-caption">😂 The Ick — results<span class="accent">!</span></div>
-      <div class="cap-opts" style="gap:12px;align-items:stretch" id="capEntries">
+      <div class="cap-mini" style="width:min(24vh,220px);margin-bottom:16px"><img src="${c.finalePhoto}" alt=""></div>
+      <div class="cap-opts" style="gap:14px;align-items:stretch;width:min(1300px,94vw);flex:none" id="capEntries">
         ${entries.map((e2, i) => `<div class="cap-entry${i === 0 ? ' first' : ''}" style="animation-delay:${i * .35}s">
           <div class="cap-vc">${e2.n}</div><div class="cap-txt">${esc(e2.text)}</div><div class="cap-who"></div></div>`).join('')}
       </div>
@@ -2669,6 +2692,7 @@ const Player = (() => {
 
   function enter() {
     show('playView');
+    stage().innerHTML = waitingCard('📡', 'Connecting…', 'Hang tight — joining the room.');   // shown until the first room snapshot lands
     db.ref('rooms/' + code).on('value', s => {
       room = s.val();
       if (!room || !room.players || !room.players[pid]) {
@@ -3128,7 +3152,7 @@ const Player = (() => {
     const c = room.caption;
     if (c.finale) {
       if ((c.finaleVotes || {})[pid] != null) { stage().innerHTML = waitingCard('🗳️', 'Vote cast', 'Waiting for the rest…'); return; }
-      const mine = Object.entries(c.finaleCaps || {}).filter(([k]) => k !== pid);
+      const mine = shuffle(Object.entries(c.finaleCaps || {}).filter(([k]) => k !== pid));   // shuffled ballot — Firebase sorts keys (HOUSE first), which would bias lazy first-tappers
       stage().innerHTML = `
         <div class="phone-title" style="color:var(--rose)">😂 Pick the funniest</div>
         <div class="phone-sub">Not your own — nice try.</div>
