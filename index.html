@@ -480,11 +480,18 @@ input[type=text]::placeholder{color:#6E5CA8;font-weight:600}
 .sd-voters{display:flex;gap:8px;justify-content:center;margin-top:16px;flex-wrap:wrap}
 .sd-col{display:flex;flex-direction:column;align-items:center;gap:12px;min-width:0}
 .taunt{max-width:min(56vh,40vw);background:var(--ink2);border:2px solid var(--line);border-radius:16px;
-  padding:9px 16px;font-weight:800;font-size:clamp(14px,1.5vw,19px);color:var(--cream);text-align:center;position:relative;
+  padding:11px 20px;font-weight:800;font-size:clamp(16px,1.9vw,26px);color:var(--cream);text-align:center;position:relative;
   animation:popIn .4s cubic-bezier(.2,1.6,.4,1) both}
 .taunt::before{content:"";position:absolute;top:-8px;left:50%;transform:translateX(-50%) rotate(45deg);
   width:14px;height:14px;background:var(--ink2);border-left:2px solid var(--line);border-top:2px solid var(--line)}
 .taunt:empty{display:none}
+.taunt.pre{animation:none;opacity:0;transform:scale(.6)}
+.tt-tag{display:inline-block;margin-left:10px;padding:2px 10px;border-radius:999px;font-size:.62em;font-weight:900;
+  vertical-align:2px;background:var(--ink3);border:2px solid var(--line);white-space:nowrap}
+.tt-tag.gold{background:rgba(255,194,75,.14);border-color:var(--gold);color:var(--gold)}
+.taunt.called{border-color:var(--gold);box-shadow:0 0 24px rgba(255,194,75,.4)}
+.taunt.called::before{border-left-color:var(--gold);border-top-color:var(--gold)}
+.taunt.backfired{opacity:.5}
 .cardcount{font-weight:800;font-size:13px;color:var(--muted)}
 .taunt-chips{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
 .taunt-chip{background:var(--ink2);border:2px solid var(--line);border-radius:999px;padding:8px 14px;
@@ -2285,12 +2292,18 @@ const TV = (() => {
         ${scoreStrip()}
         <div class="tv-caption">${d.finale ? '🏆 ' : ''}Who wins this one<span class="accent">?</span></div>
         <div class="sd-votewrap">
-          <div class="sd-col"><div class="sd-votecard"><img src="${(d.cards || {})[L]}" alt=""></div><div class="taunt">${taunts[L] ? '“' + esc(taunts[L]) + '”' : ''}</div></div>
+          <div class="sd-col"><div class="sd-votecard"><img src="${(d.cards || {})[L]}" alt=""></div><div class="taunt pre" id="tauntL">${taunts[L] ? '“' + esc(taunts[L]) + '”' : ''}</div></div>
           <div class="vs-badge">VS</div>
-          <div class="sd-col"><div class="sd-votecard"><img src="${(d.cards || {})[Rr]}" alt=""></div><div class="taunt">${taunts[Rr] ? '“' + esc(taunts[Rr]) + '”' : ''}</div></div>
+          <div class="sd-col"><div class="sd-votecard"><img src="${(d.cards || {})[Rr]}" alt=""></div><div class="taunt pre" id="tauntR">${taunts[Rr] ? '“' + esc(taunts[Rr]) + '”' : ''}</div></div>
         </div>
         <div class="tv-sub">Audience: vote on your phones — you don't know whose card is whose 👀</div>
         <div class="sd-voters" id="sdVoters"></div>`;
+      // trash-talk beat: cards land first, then each taunt slams in on the TV
+      const tauntBeat = (id, ms) => {
+        const t = $(id); if (!t || !t.textContent.trim()) return;
+        setTimeout(() => { if (room.state === 'sdVote' && t.isConnected) { t.classList.remove('pre'); SFX.play('thump'); } }, ms);
+      };
+      tauntBeat('#tauntL', 900); tauntBeat('#tauntR', 1900);
     }
     const w = $('#sdVoters'); w.innerHTML = '';
     const aud = players().filter(([pid]) => pid !== d.a && pid !== d.b);
@@ -2317,9 +2330,9 @@ const TV = (() => {
       ${scoreStrip()}
       <div class="tv-caption">The room has spoken<span class="accent">!</span></div>
       <div class="sd-votewrap">
-        <div class="sd-col"><div class="sd-votecard" id="sdL"><img src="${(d.cards || {})[L]}" alt=""><div class="votecount" id="cntL">0</div></div><div class="taunt">${taunts[L] ? '“' + esc(taunts[L]) + '”' : ''}</div></div>
+        <div class="sd-col"><div class="sd-votecard" id="sdL"><img src="${(d.cards || {})[L]}" alt=""><div class="votecount" id="cntL">0</div></div><div class="taunt" id="tauntL">${taunts[L] ? '“' + esc(taunts[L]) + '”' : ''}</div></div>
         <div class="vs-badge">${d.finale ? '🏆' : 'VS'}</div>
-        <div class="sd-col"><div class="sd-votecard" id="sdR"><img src="${(d.cards || {})[Rr]}" alt=""><div class="votecount" id="cntR">0</div></div><div class="taunt">${taunts[Rr] ? '“' + esc(taunts[Rr]) + '”' : ''}</div></div>
+        <div class="sd-col"><div class="sd-votecard" id="sdR"><img src="${(d.cards || {})[Rr]}" alt=""><div class="votecount" id="cntR">0</div></div><div class="taunt" id="tauntR">${taunts[Rr] ? '“' + esc(taunts[Rr]) + '”' : ''}</div></div>
       </div>
       <div class="tv-sub" id="sdSub"></div>`;
     // tick the votes up one by one
@@ -2380,6 +2393,23 @@ const TV = (() => {
     $('#sd' + winSide).classList.add('winner');
     $('#sd' + (winSide === 'L' ? 'R' : 'L')).classList.add('loser');
     SFX.play('win');
+    // trash-talk verdict: the winner "called it", the loser's taunt backfires
+    const winTaunt = (d.taunts || {})[winner], loseTaunt = (d.taunts || {})[loser];
+    if (winTaunt || loseTaunt) {
+      await sleep(700);
+      const wt = $('#taunt' + winSide), lt = $('#taunt' + (winSide === 'L' ? 'R' : 'L'));
+      if (winTaunt && wt) {
+        wt.classList.add('called');
+        wt.insertAdjacentHTML('beforeend', '<span class="tt-tag gold">✓ CALLED IT</span>');
+        SFX.play('gold');
+      }
+      if (loseTaunt && lt) {
+        lt.classList.add('backfired');
+        lt.insertAdjacentHTML('beforeend', '<span class="tt-tag">💀 AGED BADLY</span>');
+        SFX.play('thump');
+      }
+      await sleep(900);
+    }
     const sweep = (winSide === 'L' ? rCount : lCount) === 0 && Object.keys(votes).length >= 2;
     let pts = d.finale ? 2 : 1;
     sdLosses[loser] = (sdLosses[loser] || 0) + 1;
@@ -2816,6 +2846,8 @@ const Player = (() => {
   };
 
   async function resume(saved) {
+    show('playView');
+    stage().innerHTML = waitingCard('📡', 'Reconnecting…', 'Hang tight — rejoining the room.');   // a hung connection must never look like a blank page
     const snap = await db.ref(`rooms/${saved.code}/players/${saved.pid}`).once('value');
     if (!snap.exists()) { localStorage.removeItem('ht_player'); show('landing'); return; }
     code = saved.code; pid = saved.pid;
@@ -3140,8 +3172,19 @@ const Player = (() => {
     "She's out of your league", "Objectively correct", "Don't embarrass yourself",
     "My grandma could win with this", "Easy money", "I didn't even need my best card",
     "You're voting for her. Admit it.", "Checkmate.", "This one's for the group chat",
-    "I'm sorry it had to be this way"
+    "I'm sorry it had to be this way", "Bold of you to try", "She clears. Easily.",
+    "Pack it up, go home", "I've seen better in my spam folder", "The room's already voting for me",
+    "You brought THAT?", "Cute effort", "This is a mercy killing", "Say goodbye to your streak",
+    "Second place looks good on you", "Don't cry when it's unanimous", "Your card vs mine? Pray.",
+    "Be honest, you want her number too", "I'd explain, but you'd still lose"
   ];
+
+  // fresh rotation of 8 chips per duel so the bank doesn't go stale
+  let tauntKey = '', tauntChoices = [];
+  function tauntChoicesFor(key) {
+    if (tauntKey !== key) { tauntKey = key; tauntChoices = shuffle(TAUNTS).slice(0, 8); }
+    return tauntChoices;
+  }
 
   let handSel = null, tauntSel = null;
   function renderSdDuelPhone() {
@@ -3168,7 +3211,7 @@ const Player = (() => {
       <div class="phone-title">${d.finale ? '🏆 GRAND FINALE' : d.rematch ? '🔥 Sudden death' : '⚔️ Your duel'}</div>
       <div class="phone-sub">vs <b>${esc(opp.name)}</b>${d.finale ? ' · winner takes the crown' : ' · played cards are gone forever'}</div>
       <div class="hand-scroll" id="handRow"></div>
-      <div class="phone-sub" style="margin-top:4px">Talk your talk (optional — shown anonymously):</div>
+      <div class="phone-sub" style="margin-top:4px">🗣️ Trash talk — optional, anonymous, shown big on the TV:</div>
       <div class="taunt-chips" id="tauntRow"></div>
       <button class="btn big" id="playBtn" style="width:100%" disabled>Pick a card</button>`;
     const row = $('#handRow');
@@ -3177,8 +3220,10 @@ const Player = (() => {
       hcard.onclick = () => { handSel = url; if (navigator.vibrate) navigator.vibrate(14); renderSdDuelPhone(); };
       row.appendChild(hcard);
     });
+    const choices = tauntChoicesFor(`${sd.duelIdx}:${d.rematch || 0}:${d.finale ? 'F' : ''}:${pid}`);
+    if (tauntSel && !choices.includes(tauntSel)) tauntSel = null;
     const tr = $('#tauntRow');
-    TAUNTS.forEach(t => {
+    choices.forEach(t => {
       const chip = el('div', 'taunt-chip' + (tauntSel === t ? ' sel' : ''), esc(t));
       chip.onclick = () => { tauntSel = tauntSel === t ? null : t; if (navigator.vibrate) navigator.vibrate(10); renderSdDuelPhone(); };
       tr.appendChild(chip);
