@@ -40,7 +40,7 @@ body::before{
   content:"";position:fixed;inset:0;pointer-events:none;opacity:.05;
   background-image:repeating-linear-gradient(-45deg, var(--cream) 0 2px, transparent 2px 26px);
 }
-.view{display:none;min-height:100vh}
+.view{display:none;min-height:100vh;position:relative;z-index:0}   /* above body::before stripes — they were painting OVER static content (caption photos/boxes) */
 .view.on{display:block}
 h1,h2,h3,.display{font-family:'Bungee',cursive;font-weight:400;letter-spacing:.02em}
 button{font-family:'Outfit',sans-serif;cursor:pointer;border:none}
@@ -549,7 +549,7 @@ input[type=text]::placeholder{color:#6E5CA8;font-weight:600}
 
 /* ================ CAPTION mode (She's a 10 but…) ================ */
 .cap-stage{display:flex;align-items:center;gap:clamp(24px,4vw,64px);justify-content:center;width:100%;max-width:1700px}
-.cap-photo{width:min(60vh,38vw);flex:none;aspect-ratio:1/1;border-radius:20px;overflow:hidden;border:4px solid var(--line);box-shadow:var(--shadow)}
+.cap-photo{width:min(60vh,38vw);flex:none;aspect-ratio:1/1;border-radius:20px;overflow:hidden;background:var(--ink3);border:4px solid var(--line);box-shadow:var(--shadow)}
 .cap-photo img{width:100%;height:100%;object-fit:cover}
 .cap-opts{display:flex;flex-direction:column;gap:clamp(14px,2vh,26px);flex:1;min-width:0}
 .cap-opt{position:relative;background:var(--ink2);border:3px solid var(--line);border-radius:22px;padding:clamp(18px,2.6vh,34px) clamp(22px,2.2vw,44px);
@@ -582,7 +582,7 @@ input[type=text]::placeholder{color:#6E5CA8;font-weight:600}
 .cap-pick{display:block;width:100%;text-align:left;background:var(--ink2);border:3px solid var(--line);border-radius:14px;
   padding:14px 16px;font-weight:800;font-size:16px;color:var(--cream);margin:10px 0}
 .cap-pick.chosen{border-color:var(--gold);box-shadow:0 0 0 3px rgba(255,194,75,.3)}
-.cap-mini{width:min(60vw,240px);aspect-ratio:1/1;border-radius:16px;overflow:hidden;border:3px solid var(--line);margin:0 auto 12px}
+.cap-mini{width:min(60vw,240px);aspect-ratio:1/1;border-radius:16px;overflow:hidden;background:var(--ink3);border:3px solid var(--line);margin:0 auto 12px}
 .cap-mini img{width:100%;height:100%;object-fit:cover}
 
 /* studio — active lobbies admin */
@@ -853,9 +853,50 @@ const CAP_PROMPTS = [
   "She still sleeps with ___",
   "Her idea of a perfect Sunday is ___",
   "She's wife material, except ___",
-  "Her camera roll is 90% ___"
+  "Her camera roll is 90% ___",
+  "She's a 10 but she unironically ___",
+  "Her most-used phrase: ___",
+  "She calls ___ a personality trait",
+  "Her 3am Uber Eats order is ___",
+  "She peaked when ___",
+  "Her group chat is named ___",
+  "She's late because ___",
+  "Her search history definitely has ___",
+  "She judges guys who ___",
+  "Her Venmo history is all ___",
+  "She'd sell her soul for ___",
+  "She thinks ___ counts as cooking",
+  "Her apartment definitely smells like ___",
+  "She owns 14 of ___",
+  "Her hot take that ends friendships: ___",
+  "She ghosted a guy for ___",
+  "Her Spotify Wrapped was embarrassing because ___",
+  "She only dates guys who ___",
+  "Her Sunday scaries are caused by ___",
+  "She keeps ___ in her purse 'just in case'",
+  "She responds to 'wyd' with ___",
+  "Her brunch order takes 20 minutes because ___",
+  "She's fluent in ___",
+  "Her excuse for everything: ___",
+  "She brings ___ to the pregame",
+  "Her perfect man must ___",
+  "She rage-quit ___",
+  "Her walk of shame included ___"
 ];
-const CAP_ICK = ["She seems perfect… until ___", "Instant ick: she ___"];
+const CAP_ICK = [
+  "She seems perfect… until ___",
+  "Instant ick: she ___",
+  "The date's going great until she says ___",
+  "You noped out when she ___",
+  "She was a 10 until she opened her mouth about ___",
+  "The ick hit when she ___",
+  "Dealbreaker: she unironically ___",
+  "You fake an emergency when she ___",
+  "She loses you at ___",
+  "Everything's perfect, then she pulls out ___",
+  "Red flag speedrun: she ___",
+  "You ghost her immediately after she ___"
+];
 // house captions — phantom writer so 2-player games and odd player counts work
 const HOUSE_CAPTIONS = [
   "she claps when the plane lands",
@@ -881,7 +922,31 @@ const HOUSE_CAPTIONS = [
   "she keeps 'accidentally' liking your 2019 posts",
   "her hobby is red flags",
   "she Venmo-requests you $1.50",
-  "she rates the date mid-date"
+  "she rates the date mid-date",
+  "she says 'one drink' (it's never one)",
+  "she puts the milk in first",
+  "she live-laugh-loves. unironically",
+  "her personality is just her star sign",
+  "she screenshots the group chat",
+  "she brings a journal to the bar",
+  "she makes the waiter sing happy birthday",
+  "she claps at the movie theater",
+  "she has a spreadsheet of talking stages",
+  "she calls every guy 'buddy'",
+  "she 'forgets' her wallet every time",
+  "she argues with the Uber driver",
+  "she quotes her therapist hourly",
+  "she makes everything a photoshoot",
+  "she double-taps her ex's posts 'as a friend'",
+  "her love language is bullying you",
+  "she keeps a roster and denies it",
+  "she says 'periodt' to win arguments",
+  "she asks the barista for his sign",
+  "she's still friends with ALL her exes",
+  "she reheats fish in the shared microwave",
+  "she narrates her own red flags",
+  "she tips in exposure",
+  "she calls her situationship 'basically engaged'"
 ];
 let houseIdx = Math.floor(Math.random() * HOUSE_CAPTIONS.length);
 const houseCap = () => HOUSE_CAPTIONS[(houseIdx++) % HOUSE_CAPTIONS.length];
@@ -1589,8 +1654,8 @@ const TV = (() => {
       const c = room.caption;
       const missing = players().filter(([pid]) => {
         if (c.finale) return !(c.finaleCaps || {})[pid];
-        const m = (c.rounds[c.round] || []).find(m2 => m2.a === pid || m2.b === pid);
-        return m && !(m.a === pid ? m.capA : m.capB);
+        const mine = (c.rounds[c.round] || []).filter(m2 => m2.a === pid || m2.b === pid);
+        return mine.some(m2 => !(m2.a === pid ? m2.capA : m2.capB));
       });
       armIdle('capW:' + c.round + ':' + (c.finale ? 'F' : ''), missing.length > 0, missing.length === 1 ? missing[0][0] : null);
     } else if (st === 'capVote') {
@@ -2370,25 +2435,27 @@ const TV = (() => {
     const ps = players(), ids = ps.map(([pid]) => pid);
     const libS = await db.ref('library').once('value');
     const urls = shuffle(Object.values(libS.val() || {}).map(i => i.url));
-    const perRound = ids.length <= 3 ? ids.length : Math.ceil(ids.length / 2);   // ≤3p: everyone faces The House (keeps 2+ voters per matchup)
+    const perRound = Math.ceil(ids.length / 2);   // 3-6p: pure head-to-head (odd player doubles up) — The House only plays 2p games
+    const doubleDuty = ids.length >= 3 && ids.length % 2 === 1;   // somebody writes two captions per round — give them breathing room
+    const writeMs = doubleDuty ? 85000 : CAP_WRITE_MS;
     const need = CAP_ROUNDS * perRound + 1;
     if (urls.length < need) { toast(`Caption game needs at least ${need} photos in the library (you have ${urls.length}).`); return; }
     let ui = 0;
     const rounds = [];
     for (let r = 0; r < CAP_ROUNDS; r++) {
       const order = shuffle(ids), prompts = shuffle(CAP_PROMPTS), ms = [];
-      if (order.length <= 3) {
-        // ≤3 players: pairing them together leaves 0-1 voters — everyone faces The House instead.
-        // Each player gets their OWN photo+prompt; the other players vote on every matchup.
+      if (order.length === 2) {
+        // 2 players: pairing them together leaves zero voters — each faces The House, the other player judges
         order.forEach(a => ms.push({ photo: urls[ui++], prompt: prompts[ms.length % prompts.length], a, b: 'HOUSE',
                   capA: null, capB: houseCap(), flip: Math.random() < .5 ? 1 : 0, votes: null }));
       } else {
-        for (let i = 0; i < order.length; i += 2) {
-          const a = order[i], b = order[i + 1] || 'HOUSE';
-          ms.push({ photo: urls[ui++], prompt: prompts[(i / 2) % prompts.length], a, b,
-                    capA: null, capB: b === 'HOUSE' ? houseCap() : null,
-                    flip: Math.random() < .5 ? 1 : 0, votes: null });
-        }
+        // head-to-head pairs: same photo+prompt, two writers, everyone else votes.
+        // odd count: the leftover faces a random opponent who doubles up (fresh photo, second caption)
+        const pairs = [];
+        for (let i = 0; i + 1 < order.length; i += 2) pairs.push([order[i], order[i + 1]]);
+        if (order.length % 2) pairs.push([order[order.length - 1], order[Math.floor(Math.random() * (order.length - 1))]]);
+        pairs.forEach(([a, b], pi) => ms.push({ photo: urls[ui++], prompt: prompts[pi % prompts.length], a, b,
+                  capA: null, capB: null, flip: Math.random() < .5 ? 1 : 0, votes: null }));
       }
       rounds.push(ms);
     }
@@ -2396,7 +2463,7 @@ const TV = (() => {
     playStartFx(Math.random() < .5 ? 'vo_start_1' : 'vo_start_2');
     R().update({
       state: 'capWrite', mode: 'caption',
-      caption: { rounds, round: 0, matchupIdx: 0, finale: false, finalePrompt: null,
+      caption: { rounds, writeMs, round: 0, matchupIdx: 0, finale: false, finalePrompt: null,
                  finalePhoto: urls[ui], finaleCaps: null, finaleVotes: null, scores, best: null }
     });
   }
@@ -2416,7 +2483,7 @@ const TV = (() => {
     const key = `capW:${c.round}:${c.finale ? 'F' : ''}`;
     if (once('snd:' + key)) {
       clearCapTimer();
-      capWriteDeadline = Date.now() + CAP_WRITE_MS;
+      capWriteDeadline = Date.now() + (c.writeMs || CAP_WRITE_MS);
       capTimerInt = setInterval(() => {
         if (!room || room.state !== 'capWrite') return clearCapTimer();
         const t = $('#capTimer'); if (!t) return;
@@ -2448,8 +2515,8 @@ const TV = (() => {
             <div style="font-weight:800;font-size:13px;color:${in2 ? 'var(--teal)' : 'var(--muted)'}">${in2 ? '✓ both in' : 'writing…'}</div></div>`;
         }).join('')}</div>
         <div class="waiting-avatars" style="margin-top:20px">${ps.map(([pid, p]) => {
-          const m = (c.rounds[c.round] || []).find(m2 => m2.a === pid || m2.b === pid);
-          const doneW = m && (m.a === pid ? m.capA : m.capB);
+          const myMs = (c.rounds[c.round] || []).filter(m2 => m2.a === pid || m2.b === pid);
+          const doneW = myMs.length > 0 && myMs.every(m2 => m2.a === pid ? m2.capA : m2.capB);
           return `<div class="wa${doneW ? ' done' : ''}"><img src="${p.avatar}" alt=""></div>`;
         }).join('')}</div>`;
     }
@@ -2787,8 +2854,8 @@ const Player = (() => {
       const c = room.caption || {};
       if (room.state === 'capWrite') {
         if (c.finale) return (c.finaleCaps || {})[pid] ? 1 : 0;
-        const m = ((c.rounds || [])[c.round] || []).find(m2 => m2.a === pid || m2.b === pid);
-        return m ? ((m.a === pid ? m.capA : m.capB) ? 1 : 0) : 'x';
+        const mine = ((c.rounds || [])[c.round] || []).filter(m2 => m2.a === pid || m2.b === pid);
+        return mine.length + ':' + mine.filter(m2 => (m2.a === pid ? m2.capA : m2.capB)).length;
       }
       if (room.state === 'capVote') {
         if (c.finale) return (c.finaleVotes || {})[pid] != null ? 1 : 0;
@@ -3186,9 +3253,10 @@ const Player = (() => {
   const waitingCard = (emoji, h3, p2) => `<div class="big-emoji">${emoji}</div>
     <div class="status-card card"><h3>${h3}</h3><p>${p2}</p></div>`;
 
-  function captionForm(photo, prompt, onSubmit) {
+  function captionForm(photo, prompt, onSubmit, tag) {
     stage().innerHTML = `
       <div class="phone-title" style="color:var(--rose)">😂 Be funny</div>
+      ${tag ? `<div class="phone-sub" style="margin-bottom:8px;color:var(--gold)">${esc(tag)}</div>` : ''}
       <div class="cap-mini"><img src="${photo}" alt=""></div>
       <div class="phone-sub" style="margin-bottom:12px">${esc(prompt)}</div>
       <textarea class="cap-ta" id="capTa" maxlength="80" placeholder="your caption… (80 chars)"></textarea>
@@ -3206,11 +3274,15 @@ const Player = (() => {
       return;
     }
     const ms = (c.rounds || [])[c.round] || [];
-    const mi = ms.findIndex(m2 => m2.a === pid || m2.b === pid);
-    if (mi < 0) { stage().innerHTML = waitingCard('🍿', 'Sit this one out', 'Watch the TV — the room is writing.'); return; }
-    const m = ms[mi], mine = m.a === pid ? 'capA' : 'capB';
-    if (m[mine]) { stage().innerHTML = waitingCard('🤫', 'Caption in!', 'Waiting for the slow writers…'); return; }
-    captionForm(m.photo, m.prompt, t => R().child(`caption/rounds/${c.round}/${mi}/${mine}`).set(t));
+    // double-duty rounds: a player can be in TWO matchups — walk through one form at a time
+    const myMs = ms.map((m2, mi) => ({ m2, mi })).filter(({ m2 }) => m2.a === pid || m2.b === pid);
+    if (!myMs.length) { stage().innerHTML = waitingCard('🍿', 'Sit this one out', 'Watch the TV — the room is writing.'); return; }
+    const open = myMs.find(({ m2 }) => !(m2.a === pid ? m2.capA : m2.capB));
+    if (!open) { stage().innerHTML = waitingCard('🤫', myMs.length > 1 ? 'Both captions in!' : 'Caption in!', 'Waiting for the slow writers…'); return; }
+    const m = open.m2, side = m.a === pid ? 'capA' : 'capB';
+    const doneCt = myMs.filter(({ m2 }) => (m2.a === pid ? m2.capA : m2.capB)).length;
+    captionForm(m.photo, m.prompt, t => R().child(`caption/rounds/${c.round}/${open.mi}/${side}`).set(t),
+                myMs.length > 1 ? `You're in ${myMs.length} matchups — caption ${doneCt + 1} of ${myMs.length}!` : null);
   }
 
   function renderCapVote() {
