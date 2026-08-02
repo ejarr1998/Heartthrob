@@ -181,11 +181,11 @@ input[type=text]::placeholder{color:#6E5CA8;font-weight:600}
 }
 .chip.gold1{width:66px;height:66px;border-color:var(--gold)}
 .chip.gold1 .rk{background:var(--gold);color:#4A3405;border-color:#fff}
-.rank-banner{position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:5;
-  font-family:'Bungee';font-size:clamp(22px,3vw,40px);white-space:nowrap;color:var(--cream);
+.rank-banner{position:relative;z-index:5;margin-bottom:14px;text-align:center;
+  font-family:'Bungee';font-size:clamp(16px,1.8vw,28px);color:var(--cream);
   background:rgba(25,16,54,.82);border:2px solid var(--line);border-radius:14px;padding:8px 22px;
   box-shadow:var(--shadow);backdrop-filter:blur(3px)}
-.rank-banner:empty{display:none}
+.rank-banner:empty{visibility:hidden}   /* keep the space reserved so the rail doesn't jump */
 .rank-banner.gold{color:var(--gold);border-color:var(--gold)}
 
 /* battle (faceoff / final) */
@@ -1541,10 +1541,10 @@ const TV = (() => {
     stage().innerHTML = `
       <div class="tv-split">
         <div class="tv-main">
-          <div class="rank-banner" id="rankBanner"></div>
           <div class="grid2" id="tvGrid"></div>
         </div>
         <div class="tv-side">
+          <div class="rank-banner" id="rankBanner"></div>
           <div class="tv-caption">The verdict<span class="accent">!</span></div>
           <div class="tv-sub" id="revealSub"></div>
         </div>
