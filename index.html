@@ -1390,7 +1390,7 @@ const TV = (() => {
         if (idleHoldout && vpackOf(idleHoldout) === 'gabe') VOICE.say(idleFires === 1 ? 'gabeone' : 'gabethree');
         else VOICE.any(['vo_hurry_1', 'vo_hurry_2']);
         armIdle(idleKey, true, idleHoldout);
-      }, 45000);
+      }, 30000);   // nag after 30s idle (was 45s), max 2 per screen
     }
   }
   /* ---------- render dispatcher ---------- */
