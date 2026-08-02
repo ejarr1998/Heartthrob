@@ -794,7 +794,11 @@ const SFX = (() => {
   // unlock on any gesture (browsers block audio until user interacts)
   ['pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, () => ac(), { capture: true }));
 
+  // while a voice line is speaking, synth SFX duck so the voice stays on top
+  let ducked = false;
+  function setDucked(v) { ducked = v; }
   function tone(c, { f = 440, f2 = null, type = 'sine', t = 0, dur = .15, vol = .18 }) {
+    if (ducked) vol *= .4;
     const o = c.createOscillator(), g = c.createGain();
     o.type = type; o.frequency.setValueAtTime(f, c.currentTime + t);
     if (f2 != null) o.frequency.exponentialRampToValueAtTime(Math.max(f2, 1), c.currentTime + t + dur);
@@ -805,6 +809,7 @@ const SFX = (() => {
     o.start(c.currentTime + t); o.stop(c.currentTime + t + dur + .05);
   }
   function noise(c, { t = 0, dur = .3, vol = .2, from = 400, to = 2400 }) {
+    if (ducked) vol *= .4;
     const len = c.sampleRate * dur, buf = c.createBuffer(1, len, c.sampleRate);
     const d = buf.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
@@ -839,13 +844,26 @@ const SFX = (() => {
     try { fx[name] && fx[name](c, arg); } catch (e) {}
   }
   function toggleMute() { muted = !muted; localStorage.setItem('ht_mute', muted ? '1' : '0'); return muted; }
-  return { play, toggleMute, isMuted: () => muted };
+  return { play, toggleMute, setDucked, isMuted: () => muted };
 })();
 
 /* ---------------- announcer voice lines (mp3s in voice/) ---------------- */
 const VOICE = (() => {
+  /* One serialized channel for EVERY voice line — a line never plays on top of
+     another line and never cuts one off mid-word:
+       say()  — queue a one-shot announcement. If a line is playing it waits its
+                turn. Queued one-shots that wait > STALE_MS are dropped (their
+                moment has passed — nobody wants "round 3!" during round 5).
+                The queue is capped: when backed up, new one-shots are dropped
+                rather than played late.
+       seq()  — a deliberate sequence (e.g. the awards roll). Replaces pending
+                one-shots; sequence items never go stale.
+     While a line plays, synth SFX duck (SFX.setDucked) so the mix stays clean. */
   const cache = {};
-  let current = null, queueTimer = null;
+  let current = null;
+  let q = [];
+  const MAX_Q = 4, STALE_MS = 10000;
+
   function get(name) {
     if (!cache[name]) {
       const a = new Audio('voice/' + name + '.mp3');
@@ -854,40 +872,43 @@ const VOICE = (() => {
     }
     return cache[name];
   }
-  function stop() {
-    if (current) { try { current.pause(); current.currentTime = 0; } catch (e) {} current = null; }
-    if (queueTimer) { clearTimeout(queueTimer); queueTimer = null; }
+  function pump() {
+    if (current || SFX.isMuted()) return;
+    while (q.length) {
+      const item = q.shift();
+      if (item.staleAfter && Date.now() > item.staleAfter) continue;   // missed its moment
+      const a = get(item.name);
+      current = a;
+      SFX.setDucked(true);
+      const fin = () => { if (current === a) { current = null; SFX.setDucked(false); pump(); } };
+      a.onended = fin;
+      a.onerror = fin;   // missing/unreadable file — don't jam the channel
+      a.play().catch(fin);
+      return;
+    }
+    SFX.setDucked(false);
   }
   function say(name) {
     if (SFX.isMuted()) return;
-    stop();
-    const a = get(name);
-    current = a;
-    a.play().catch(() => {});   // missing file or pre-gesture: silently skip
+    if (q.length >= MAX_Q) return;
+    q.push({ name, staleAfter: Date.now() + STALE_MS });
+    pump();
   }
   function any(names) { say(names[Math.floor(Math.random() * names.length)]); }
-  // play a sequence, each starting when the previous ends (with a safety fallback)
-  function queue(names, fallbackGap = 2400) {
+  function seq(names) {
     if (SFX.isMuted() || !names.length) return;
-    stop();
-    let i = 0;
-    const next = () => {
-      if (queueTimer) { clearTimeout(queueTimer); queueTimer = null; }
-      if (i >= names.length) { current = null; return; }
-      const a = get(names[i++]);
-      current = a;
-      let advanced = false;
-      const go = () => { if (!advanced) { advanced = true; next(); } };
-      a.onended = go;
-      queueTimer = setTimeout(go, fallbackGap + 1500);
-      a.play().catch(go);
-    };
-    next();
+    q = names.map(name => ({ name, staleAfter: 0 }));
+    pump();
+  }
+  function stop() {
+    q = [];
+    if (current) { try { current.onended = null; current.onerror = null; current.pause(); current.currentTime = 0; } catch (e) {} current = null; }
+    SFX.setDucked(false);
   }
   // custom packs — files staged; per-line triggers wired once specified
   const PACKS = { gabe: ['gabeone', 'gabetwo', 'gabethree', 'gabefour', 'gabefive'],
                   mark: ['markone', 'marktwo', 'markthree', 'markfour', 'markfive'] };
-  return { say, any, queue, stop, PACKS };
+  return { say, any, seq, stop, PACKS };
 })();
 
 /* ---------------- router ---------------- */
@@ -1319,7 +1340,7 @@ const TV = (() => {
     $('#tvCode').textContent = code;
     const sb = $('#sndBtn');
     sb.textContent = SFX.isMuted() ? '🔇' : '🔊';
-    sb.onclick = () => { sb.textContent = SFX.toggleMute() ? '🔇' : '🔊'; };
+    sb.onclick = () => { const m = SFX.toggleMute(); if (m) VOICE.stop(); sb.textContent = m ? '🔇' : '🔊'; };
     const fs = $('#fsBtn');
     const toggleFs = () => {
       if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
@@ -1416,7 +1437,7 @@ const TV = (() => {
   function renderLobby() {
     const ps = players();
     if (once('vo_boot')) VOICE.say('vo_boot');
-    if (taggedPid('mark') && once('vo_marktwo')) setTimeout(() => VOICE.say('marktwo'), 800);
+    if (taggedPid('mark') && once('vo_marktwo')) VOICE.say('marktwo');   // queues right after vo_boot
     if (ps.length > prevPlayerCount) {
       SFX.play('join');
       if (ps.length === 6) VOICE.say('vo_lobby_full');
@@ -1465,7 +1486,7 @@ const TV = (() => {
       <div class="fxtitle">LET'S FIND YOUR TYPE</div>`);
     document.body.appendChild(fx);
     SFX.play('whoosh');
-    if (voiceLine) setTimeout(() => VOICE.say(voiceLine), 900);
+    if (voiceLine) VOICE.say(voiceLine);   // enqueued now so the round/draft line queues behind it
     requestAnimationFrame(() => requestAnimationFrame(() => fx.classList.add('fly')));
     setTimeout(() => {
       fx.classList.add('hit', 'shake');
@@ -1533,6 +1554,10 @@ const TV = (() => {
       g.appendChild(el('div', 'gphoto', `<img src="${room.rounds[r][i]}" alt=""><span class="corner">${L}</span><div class="chips"></div>`));
     });
     await sleep(900);
+    // ONE voice line per reveal: pick a single rank (randomly) to announce —
+    // the other three ranks just get their tone, so the announcer never
+    // talks over the stamp cascade.
+    const voiceRank = 1 + Math.floor(Math.random() * 4);
     const banner = $('#rankBanner');
     for (let rank = 4; rank >= 1; rank--) {
       banner.className = 'rank-banner' + (rank === 1 ? ' gold' : '');
@@ -1540,7 +1565,7 @@ const TV = (() => {
       banner.style.animation = 'popIn .4s cubic-bezier(.2,1.6,.4,1) both';
       banner.textContent = RANK_WORDS[rank];
       SFX.play('rank', rank);
-      VOICE.say('vo_rank' + rank);
+      if (rank === voiceRank) VOICE.say('vo_rank' + rank);
       await sleep(650);
       for (const [pid, p] of ps) {
         if (!votes[pid]) continue;
@@ -1612,7 +1637,7 @@ const TV = (() => {
       const custom = vpackOf(pid) === 'gabe' ? 'gabefive' : vpackOf(pid) === 'mark' ? 'markone' : null;
       const opener = room.phase === 'faceoff' && room.turnIdx === 0 ? 'vo_faceoff'
                    : isFinal && room.turnIdx === 0 ? 'vo_final_phase' : null;
-      if (opener && custom) VOICE.queue([opener, custom]);
+      if (opener && custom) VOICE.seq([opener, custom]);
       else if (opener) VOICE.say(opener);
       else if (custom) VOICE.say(custom);
       else VOICE.any(['vo_turn_1', 'vo_turn_2']);
@@ -1643,7 +1668,7 @@ const TV = (() => {
       battleScreenKey = bk; prevPredCount = 0;
       battleShell(`${esc(room.players[b.pid].name)} is choosing<span class="dots"></span>`);
       SFX.play('vs');
-      if (players().length > 1 && once('vo_callit')) setTimeout(() => VOICE.say('vo_callit'), 700);
+      if (players().length > 1 && once('vo_callit')) VOICE.say('vo_callit');   // queues behind the turn-intro line
     }
     const predCount = Object.keys(preds).length;
     if (predCount > prevPredCount) SFX.play('lock');
@@ -1828,7 +1853,7 @@ const TV = (() => {
     if (hb) voq.push('vo_heartbreaker');
     if (ids.length >= 3) voq.push('vo_twins', 'vo_contrarian');
     if (ez) voq.push('vo_easyread');
-    VOICE.queue(voq);
+    VOICE.seq(voq);
     stage().innerHTML = `
       <div class="awards-scroll"><div class="awards-inner">
         <div class="tv-caption">The awards<span class="accent">!</span></div>
@@ -1863,7 +1888,7 @@ const TV = (() => {
       <div class="showcase-grid">${cards}</div>
       <div class="tv-sub" style="margin-top:24px"><button class="btn ghost" id="againBtn">🔁 New game</button></div>`;
     if (once('vo_showcase')) VOICE.say('vo_showcase');
-    if (match) setTimeout(() => { SFX.play('win'); VOICE.say('vo_same_type'); }, 1600);
+    if (match) { setTimeout(() => SFX.play('win'), 1600); VOICE.say('vo_same_type'); }   // line queues after vo_showcase
     $('#againBtn').onclick = async () => { await db.ref('rooms/' + code).remove(); sessionStorage.removeItem('ht_tv'); location.reload(); };
   }
 
@@ -1903,7 +1928,7 @@ const TV = (() => {
   function renderSdDraftTV() {
     const sd = room.showdown, ps = players();
     const kept = sd.kept || {};
-    if (once('vo_sd_draft')) setTimeout(() => VOICE.say('vo_sd_draft'), 3200);
+    if (once('vo_sd_draft')) VOICE.say('vo_sd_draft');   // queues behind vo_sd_start
     stage().innerHTML = `
       <div class="tv-caption">⚔️ Draft your squad<span class="accent">!</span></div>
       <div class="tv-sub" style="margin:0 0 20px">Everyone got ${sd.deal} secret photos — keep your best ${sd.keep}. Choose fighters the <b style="color:var(--cream)">room</b> will vote for, not just your favorites…</div>
@@ -2109,7 +2134,7 @@ const TV = (() => {
     if (vpackOf(winner) === 'gabe') voq.push('gabefour');
     if (vpackOf(loser) === 'mark') voq.push(sdLosses[loser] === 3 ? 'markfive' : 'markthree');
     if (!voq.length) voq.push(['vo_win_1', 'vo_win_2', 'vo_win_3'][Math.floor(Math.random() * 3)]);
-    VOICE.queue(voq);
+    VOICE.seq(voq);
     $('#sdSub').innerHTML = `<b style="color:var(--gold)">${esc(room.players[winner].name)}</b> takes it${d.finale ? ' — and the finale!' : sweep ? ' — unanimous, bonus point!' : '!'}`;
     u[`showdown/scores/${winner}`] = ((sd.scores || {})[winner] || 0) + pts;
     await sleep(sweep ? 2600 : 2400);
