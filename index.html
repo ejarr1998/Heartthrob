@@ -681,7 +681,10 @@ input[type=text]::placeholder{color:#6E5CA8;font-weight:600}
   <div class="phone-shell">
     <div class="phone-top">
       <div class="me-pill"><div class="pav"><img id="meAvatar" alt=""></div><b id="meName"></b></div>
-      <div class="roomcode-pill" style="padding:5px 14px"><b id="meRoom" style="font-size:15px"></b></div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <button class="snd-btn" id="phoneFsBtn" title="Fullscreen" style="width:40px;height:40px;font-size:17px">⛶</button>
+        <div class="roomcode-pill" style="padding:5px 14px"><b id="meRoom" style="font-size:15px"></b></div>
+      </div>
     </div>
     <div id="playStage" style="flex:1;display:flex;flex-direction:column"></div>
   </div>
@@ -2867,6 +2870,17 @@ const Player = (() => {
       render();
     });
     $('#top10Close').onclick = () => $('#top10Modal').classList.remove('on');
+  }
+
+  // fullscreen toggle (mirrors the TV's button) — hidden where unsupported (iPhone Safari)
+  const pfs = $('#phoneFsBtn');
+  if (!document.documentElement.requestFullscreen) pfs.style.display = 'none';
+  else {
+    pfs.onclick = () => {
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+      else document.documentElement.requestFullscreen().catch(() => toast('Fullscreen blocked by the browser.'));
+    };
+    document.addEventListener('fullscreenchange', () => { pfs.textContent = document.fullscreenElement ? '🗗' : '⛶'; });
   }
 
   const R = () => db.ref('rooms/' + code);
