@@ -1836,6 +1836,7 @@ const TV = (() => {
     else if (st === 'ccFinal') { if (once('ccFinal')) renderCcFinal(); }
     else if (st === 'prBuild') renderPrBuildTV();
     else if (st === 'prReview') { if (once('prReview:' + room.review.idx)) playPrReview(); }
+    else if (st === 'prDebate') { if (once('prDebate')) playPrDebate(); }
     else if (st === 'prFinal') { if (once('prFinal')) renderPrFinal(); }
     else if (st === 'ssIntro') renderSsIntroTV();
     else if (st === 'ssWrite') renderSsWriteTV();
@@ -3564,7 +3565,7 @@ function renderSsWriteTV() {
 
   function prNext() {
     const k = room.review;
-    R().update(k.idx + 1 < k.order.length ? { 'review/idx': k.idx + 1 } : { state: 'prFinal' });
+    R().update(k.idx + 1 < k.order.length ? { 'review/idx': k.idx + 1 } : { state: 'prDebate' });
   }
 
   async function playPrReview() {
@@ -3589,7 +3590,7 @@ function renderSsWriteTV() {
           <div class="pr-photos">${(prof.photos || []).map(u => `<div class="pr-photo">${mediaTag(u)}</div>`).join('')}</div>
           <div class="ss-card-body" style="gap:10px">
             ${(prof.prompts || []).map(pr => `<div class="ss-prompt" style="padding:10px 14px"><div class="ss-prompt-lbl">${esc(pr.label)}</div><div class="ss-prompt-ans" style="font-size:clamp(14px,1.4vw,20px)">“${esc(pr.answer)}”</div></div>`).join('')}
-            ${prof.bio ? `<div class="tv-sub" style="font-style:italic">“${esc(prof.bio)}”</div>` : ''}
+            ${prof.bio ? `<div class="ss-prompt comment" style="padding:12px 16px"><div class="ss-prompt-lbl">Bio</div><div class="ss-prompt-ans" style="font-size:clamp(16px,1.7vw,26px)">“${esc(prof.bio)}”</div></div>` : ''}
           </div>
         </div>
         <div id="prPanel" style="flex:1;min-width:min(560px,48vw);display:flex;flex-direction:column;gap:14px"></div>
@@ -3620,10 +3621,80 @@ function renderSsWriteTV() {
     const u = {}; u[`review/scores/${pid}`] = ((k.scores || {})[pid] || 0) + pts;
     await R().update(u);
     const last = idx + 1 >= k.order.length;
-    const nextBtn = el('button', 'btn big gold', last ? 'Final results ▶' : 'Next profile ▶');
+    const nextBtn = el('button', 'btn big gold', last ? 'The panel decides ▶' : 'Next profile ▶');
     nextBtn.style.cssText = 'margin-top:18px;font-size:clamp(18px,1.8vw,26px)';
     stage().appendChild(nextBtn);
     nextBtn.onclick = () => { nextBtn.disabled = true; SFX.play('whoosh'); prNext(); };
+  }
+
+  function prMockDebate(contenders) {
+    const top = [...contenders].sort((a, b) => b.rights - a.rights)[0] || {};
+    return {
+      debate: [
+        { who: 'romantic', text: 'Okay, we all know who stole my heart tonight.', audioUrl: null },
+        { who: 'savage', text: 'If you say the guy with the car selfie, I am leaving this panel.', audioUrl: null },
+        { who: 'unhinged', text: 'I vote based on vibes and the vibes have spoken.', audioUrl: null },
+        { who: 'romantic', text: 'Then we are agreed. Bring him forward.', audioUrl: null }
+      ],
+      winnerPid: top.pid || null, crownLine: `${top.name || 'Nobody'}, the panel has spoken. You are the most dateable man in this room.`, crownAudioUrl: null
+    };
+  }
+
+  async function playPrDebate() {
+    const k = room.review;
+    let deb = k.debate;
+    if (!deb) {
+      stage().innerHTML = `${prScoreStrip()}
+        <div class="tv-caption">😈 The panel is arguing amongst themselves<span class="accent">…</span></div>
+        <div class="tv-sub">💗 🔪 🤪 this could get ugly<span class="dots"></span></div>`;
+      const contenders = (k.order || []).map(pid => {
+        const v = (k.verdicts || {})[pid] || {};
+        return {
+          pid, name: (room.players[pid] || {}).name || '???',
+          rights: ['romantic', 'savage', 'unhinged'].filter(pp => (v[pp] || {}).swipe === 'right').length,
+          prompts: ((k.profiles || {})[pid] || {}).prompts || [],
+          bio: ((k.profiles || {})[pid] || {}).bio || '',
+          comments: { romantic: (v.romantic || {}).comment, savage: (v.savage || {}).comment, unhinged: (v.unhinged || {}).comment }
+        };
+      });
+      let out = await aiCall('prDeliberate', { contenders }, 35000);
+      if (!out || !out.debate || !out.debate.length) out = prMockDebate(contenders);
+      if (!out.winnerPid || !room.players[out.winnerPid]) {
+        out.winnerPid = [...contenders].sort((a, b) => b.rights - a.rights)[0].pid;   // fall back to swipe leader
+      }
+      const u = { 'review/debate': out };
+      u[`review/scores/${out.winnerPid}`] = ((k.scores || {})[out.winnerPid] || 0) + 200;   // crown bonus
+      await R().update(u);
+      deb = out;
+    }
+    stage().innerHTML = `
+      ${prScoreStrip()}
+      <div class="tv-caption">😈 The panel deliberates<span class="accent">…</span></div>
+      <div id="prChat" style="display:flex;flex-direction:column;gap:12px;width:min(1000px,88vw);align-items:stretch"></div>
+      <div id="prCrown"></div>`;
+    await sleep(1200);
+    const chat = $('#prChat');
+    for (const line of deb.debate) {
+      if (room.state !== 'prDebate') return;
+      const meta = { romantic: ['💗', 'The Romantic'], savage: ['🔪', 'The Savage'], unhinged: ['🤪', 'The Unhinged One'] }[line.who];
+      const b = el('div', 'pr-verdict', `<div class="pr-persona">${meta[0]} <b>${meta[1]}</b></div><div class="pr-comment">“${esc(line.text)}”</div>`);
+      b.style.animation = 'slideUp .45s both';
+      chat.appendChild(b);
+      if (line.audioUrl) VOICE.sayUrl(line.audioUrl); else speakHer(line.text || '');
+      await sleep(Math.min(7500, 2400 + (line.text || '').length * 65));
+    }
+    const champ = room.players[deb.winnerPid] || {};
+    const crown = el('div', 'ss-line', `👑 “${esc(deb.crownLine || '')}”
+      <div class="ss-who">${pav(champ.avatar || '')}<span>${esc(champ.name || '???')} · +200 · MOST DATEABLE</span></div>`);
+    crown.style.cssText = 'margin-top:14px;animation:megaIn .6s both;max-width:min(1000px,88vw)';
+    $('#prCrown').appendChild(crown);
+    SFX.play('gold');
+    if (deb.crownAudioUrl) VOICE.sayUrl(deb.crownAudioUrl); else speakHer(deb.crownLine || '');
+    await sleep(Math.min(8000, 3200 + (deb.crownLine || '').length * 70));
+    const nextBtn = el('button', 'btn big gold', 'Final results ▶');
+    nextBtn.style.cssText = 'margin-top:20px;font-size:clamp(18px,1.8vw,26px)';
+    stage().appendChild(nextBtn);
+    nextBtn.onclick = () => { nextBtn.disabled = true; SFX.play('whoosh'); R().update({ state: 'prFinal' }); };
   }
 
   function renderPrFinal() {
@@ -3774,7 +3845,7 @@ const Player = (() => {
       sd.duelIdx, d.rematch, !!(sd.kept && sd.kept[pid]), !!(d.cards && d.cards[pid]), d.votes && d.votes[pid] != null,
       (room.caption || {}).round, (room.caption || {}).matchupIdx, !!(room.caption || {}).finale, capSelfKey(),
       (room.contest || {}).round, ccSelfKey(), (room.shoot || {}).round, ssSelfKey(),
-      (room.review || {}).idx, prSelfKey()].join('|');
+      (room.review || {}).idx, prSelfKey()].join('|');   // state covers prDebate/prFinal
     if (key === lastKey) return;
     lastKey = key;
     function prSelfKey() {
@@ -3836,6 +3907,7 @@ const Player = (() => {
     else if (st === 'ccFinal') renderCcFinalPhone();
     else if (st === 'prBuild') renderPrBuild();
     else if (st === 'prReview') stage().innerHTML = waitingCard('😈', 'The panel is judging…', 'Sweat. They are merciless.');
+    else if (st === 'prDebate') stage().innerHTML = waitingCard('🍿', 'The panel is arguing…', 'They are fighting about YOU on the TV.');
     else if (st === 'prFinal') renderPrFinalPhone();
     else if (st === 'ssIntro') stage().innerHTML = waitingCard('😏', 'Shoot Your Shot is loading…', 'The AI is writing the profiles. Get your game face on.');
     else if (st === 'ssWrite') renderSsWrite();
@@ -4518,9 +4590,11 @@ function renderSsWrite() {
       <button class="btn small teal" id="prAddPhoto" style="margin-top:8px">📁 Add photos (2-3)</button>
       <input type="file" id="prPhotoInput" accept="image/*" multiple hidden>
       <div id="prPrompts" style="width:100%;margin-top:12px"></div>
-      <input type="text" class="cap-ta" id="prBio" maxlength="60" placeholder="bio (optional)" style="min-height:0;height:auto;padding:12px;margin-top:10px">
+      <textarea class="cap-ta" id="prBio" maxlength="120" placeholder="bio (optional — sell yourself)" style="min-height:52px;padding:12px;margin-top:10px;resize:none;overflow:hidden"></textarea>
       <button class="btn big" id="prSubmit" style="width:100%;margin-top:14px" disabled>Submit to the panel ▶</button>`;
     ssStartPhoneTimer(180000);
+    const bioTa = $('#prBio');
+    bioTa.oninput = () => { bioTa.style.height = '52px'; bioTa.style.height = Math.min(180, bioTa.scrollHeight) + 'px'; };
     const answers = [{ label: PR_PROMPTS[0], answer: '' }, { label: PR_PROMPTS[1], answer: '' }];
     const pbox = $('#prPrompts');
     answers.forEach((a, i) => {

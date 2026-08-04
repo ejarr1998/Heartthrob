@@ -200,3 +200,50 @@ exports.prJudge = onCall({ region: 'us-central1', timeoutSeconds: 60 }, async (r
     return { demo: true };
   }
 });
+
+/* ---- Profile Review finale: the panel argues it out and crowns a champion ---- */
+exports.prDeliberate = onCall({ region: 'us-central1', timeoutSeconds: 60 }, async (req) => {
+  const d = req.data || {};
+  if (!ANTHROPIC_KEY() || !Array.isArray(d.contenders)) return { demo: true };
+  try {
+    const sheet = d.contenders.map(c =>
+      `- pid "${c.pid}" (${c.name}): ${c.rights}/3 right swipes. Prompts: ${(c.prompts || []).map(pr => `"${pr.label}" -> "${pr.answer}"`).join('; ')}.` +
+      (c.bio ? ` Bio: "${c.bio}".` : '') +
+      ` Panel said — Romantic: "${(c.comments || {}).romantic || ''}", Savage: "${(c.comments || {}).savage || ''}", Unhinged: "${(c.comments || {}).unhinged || ''}"`
+    ).join('\n');
+    const text = await claude(
+      'You are the SAME three women from the review panel (ROMANTIC, SAVAGE, UNHINGED), now arguing amongst yourselves to crown one champion of the night. ' +
+      'You bicker, interrupt, reference your own earlier verdicts and specific profile details, then agree on ONE winner. ' +
+      'Debate lines are 1-2 sentences each, strictly PG-13, in character. Return ONLY JSON — no markdown.',
+      'The contenders:\n' + sheet + '\n\n' +
+      'Return JSON with EXACTLY these keys:\n' +
+      '"debate": array of 6-9 objects {"who": "romantic"|"savage"|"unhinged", "text": spoken line} — a real argument that builds to a decision,\n' +
+      '"winnerPid": pid of the champion (copy EXACTLY),\n' +
+      '"crownLine": one sentence crowning him, spoken by whichever persona championed him.',
+      1100);
+    const j = firstJson(text, '{', '}');
+    const VOICES = {
+      romantic: process.env.ELEVENLABS_VOICE_ROMANTIC || 'EXAVITQu4vr4xnSDxMaL',
+      savage: process.env.ELEVENLABS_VOICE_SAVAGE || 'cgSgspJ2msm6clMCkdW9',
+      unhinged: process.env.ELEVENLABS_VOICE_UNHINGED || 'pFZP5JQG7iQjIQuC4Bku'
+    };
+    const jobs = [];
+    const debate = (Array.isArray(j.debate) ? j.debate : []).slice(0, 9).map(line => {
+      const who = ['romantic', 'savage', 'unhinged'].includes(line.who) ? line.who : 'savage';
+      const out = { who, text: line.text || '', audioUrl: null };
+      if (ELEVENLABS_KEY() && out.text) {
+        jobs.push(ttsToStorage(out.text, VOICES[who]).then(u => { out.audioUrl = u; }).catch(e => console.error('debate tts failed', e)));
+      }
+      return out;
+    });
+    const crown = { text: j.crownLine || '', audioUrl: null };
+    if (ELEVENLABS_KEY() && crown.text) {
+      jobs.push(ttsToStorage(crown.text, VOICES.romantic).then(u => { crown.audioUrl = u; }).catch(e => console.error('crown tts failed', e)));
+    }
+    await Promise.all(jobs);
+    return { debate, winnerPid: j.winnerPid || null, crownLine: crown.text, crownAudioUrl: crown.audioUrl };
+  } catch (e) {
+    console.error('prDeliberate failed', e);
+    return { demo: true };
+  }
+});
