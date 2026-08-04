@@ -1161,7 +1161,11 @@ function route() {
   const h = location.hash;
   if (h === '#studio') { show('hostView'); Studio.init(); }
   else if (h === '#tv') { show('tvView'); TV.init(); }
-  else if (h === '#join') { show('joinView'); }
+  else if (h === '#join') {
+    // a device that already joined should fall straight back into its room, not re-type the code
+    const saved = (() => { try { return JSON.parse(localStorage.getItem('ht_player') || 'null'); } catch (e) { return null; } })();
+    if (saved && saved.code && saved.pid) Player.resume(saved); else show('joinView');
+  }
   else {
     const saved = JSON.parse(localStorage.getItem('ht_player') || 'null');
     if (saved && saved.code && saved.pid) { Player.resume(saved); } else show('landing');
@@ -3471,7 +3475,7 @@ const Player = (() => {
     show('playView');
     stage().innerHTML = waitingCard('📡', 'Reconnecting…', 'Hang tight — rejoining the room.');   // a hung connection must never look like a blank page
     const snap = await db.ref(`rooms/${saved.code}/players/${saved.pid}`).once('value');
-    if (!snap.exists()) { localStorage.removeItem('ht_player'); show('landing'); return; }
+    if (!snap.exists()) { localStorage.removeItem('ht_player'); show(location.hash === '#join' ? 'joinView' : 'landing'); return; }
     code = saved.code; pid = saved.pid;
     enter();
   }
