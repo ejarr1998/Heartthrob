@@ -587,6 +587,17 @@ input[type=text]::placeholder{color:#6E5CA8;font-weight:600}
 @keyframes ssTossL{25%{transform:translate(0,-16px) rotate(-4deg)}to{transform:translate(-72vw,-26vh) rotate(-28deg);opacity:0}}
 .ss-win{border-color:var(--gold)!important;box-shadow:0 0 28px rgba(255,200,60,.4);transform:scale(1.1);background:rgba(255,200,60,.08)!important}
 .ss-pin{display:flex;flex-direction:column;align-items:center;gap:16px;animation:slideUp .45s both}
+.ss-card{width:min(500px,88vw);background:var(--ink2);border:2px solid var(--line);border-radius:26px;overflow:hidden;text-align:left;box-shadow:0 24px 60px rgba(0,0,0,.5);animation:cardIn .55s both}
+.ss-card-photo{position:relative;width:100%;height:min(44vh,440px);overflow:hidden}
+.ss-card-photo img,.ss-card-photo video{width:100%;height:100%;object-fit:cover;display:block}
+.ss-card-name{position:absolute;left:0;right:0;bottom:0;padding:44% 22px 14px;background:linear-gradient(transparent,rgba(8,5,16,.94));font-family:'Bungee';font-size:clamp(26px,3vw,44px);color:var(--cream);text-shadow:0 2px 12px rgba(0,0,0,.7);pointer-events:none}
+.ss-card-body{padding:16px 20px 20px;display:flex;flex-direction:column;gap:14px}
+.ss-prompt{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:13px 18px}
+.ss-prompt-lbl{font-size:clamp(10px,.85vw,13px);font-weight:800;letter-spacing:.16em;color:var(--muted);text-transform:uppercase}
+.ss-prompt-ans{margin-top:6px;font-weight:800;font-size:clamp(17px,1.85vw,28px);line-height:1.22;color:var(--rose);text-wrap:balance}
+.ss-pillrow{display:flex;flex-wrap:wrap;gap:8px}
+.ss-pill{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:7px 14px;font-weight:700;font-size:clamp(12px,1.05vw,16px)}
+.ss-pill.red{border-color:rgba(255,90,120,.5);color:#ffb3c2}
 .ss-photo{position:relative;overflow:hidden}
 .ss-photo-name{position:absolute;left:0;right:0;bottom:0;padding:40% 20px 14px;background:linear-gradient(transparent,rgba(8,5,16,.92));font-family:'Bungee';font-size:clamp(22px,2.6vw,44px);color:var(--cream);text-shadow:0 2px 12px rgba(0,0,0,.7);pointer-events:none;z-index:2}
 .ss-chips{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -696,8 +707,12 @@ input[type=text]::placeholder{color:#6E5CA8;font-weight:600}
         <label>Your face</label>
         <div class="avatar-pick">
           <div class="avatar-preview" id="avatarPreview">📷</div>
-          <button class="btn small teal" id="avatarBtn">Take / choose selfie</button>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <button class="btn small teal" id="avatarBtn">📸 Take selfie</button>
+            <button class="btn small" id="avatarRollBtn">🖼 Camera roll</button>
+          </div>
           <input type="file" id="avatarInput" accept="image/*" capture="user" hidden>
+          <input type="file" id="avatarRollInput" accept="image/*" hidden>
         </div>
       </div>
       <button class="btn big" id="joinBtn" style="width:100%;margin-top:6px">Let's go →</button>
@@ -3226,7 +3241,6 @@ const TV = (() => {
     cycle();
     iv = setInterval(cycle, 2200);
   }
-
 function renderSsWriteTV() {
     const k = room.shoot, ps = players(), lines = k.lines || {}, prof = k.profiles[k.round];
     const rt = k.roundTypes[k.round];
@@ -3234,19 +3248,22 @@ function renderSsWriteTV() {
     const key = `ssW:${k.round}`;
     const r = k.round;
     const live = () => room.state === 'ssWrite' && (room.shoot || {}).round === r;
-    if (once('snd:' + key)) {   // staged dating-profile reveal; timer arms only when the floor opens
+    if (once('snd:' + key)) {   // the Hinge card: her profile deals in like you're scrolling it
       SFX.play('whoosh');
       VOICE.say(r === SS_ROUNDS - 1 ? 'vo_final_round' : VOICE.pickFresh(['vo_round_1', 'vo_round_2', 'vo_round_3']));
       stage().innerHTML = `
         ${ssScoreStrip()}
         <div class="tv-caption">😏 Round ${r + 1} of ${SS_ROUNDS} — shoot your shot<span class="accent">!</span></div>
         <div class="cap-timer" id="ccTimer"></div>
-        <div class="cap-stage">
-          <div class="cap-photo ss-photo">${mediaTag(prof.photo)}
-            <div class="ss-photo-name">${esc(prof.name)}, ${prof.age}</div></div>
-          <div class="ss-profile">
-            <div class="ss-greet" id="ssGreet" style="display:none">“${esc(prof.greeting)}”</div>
-            <div class="ss-chips" id="ssChips"></div>
+        <div class="ss-card">
+          <div class="ss-card-photo">${mediaTag(prof.photo)}
+            <div class="ss-card-name">${esc(prof.name)}, ${prof.age}</div></div>
+          <div class="ss-card-body">
+            <div class="ss-prompt" id="ssPrompt" style="display:none">
+              <div class="ss-prompt-lbl">The way to my heart</div>
+              <div class="ss-prompt-ans">“${esc(prof.greeting)}”</div>
+            </div>
+            <div class="ss-pillrow" id="ssPills"></div>
           </div>
         </div>
         <div class="tv-sub" id="ssRule" style="margin-top:14px;display:none">${rule}</div>
@@ -3254,22 +3271,17 @@ function renderSsWriteTV() {
       (async () => {
         await sleep(2600);                       // beat 1: just her — face, name, age
         if (!live()) return;
-        const g = $('#ssGreet'); if (g) { g.style.display = ''; g.style.animation = 'slideUp .5s both'; }
-        await sleep(1300);                       // beat 2: her greeting
+        const g = $('#ssPrompt'); if (g) { g.style.display = ''; g.style.animation = 'slideUp .5s both'; }
+        await sleep(1400);                       // beat 2: her prompt answer
         if (!live()) return;
-        const chips = [
-          ['Job', prof.job, ''],
-          ['Vibe', prof.vibe, ''],
-          ['Looking for', prof.looking_for, ''],
-          ['Dealbreaker', prof.dealbreaker, ' red']
-        ];
-        const box = $('#ssChips');
-        for (const [lbl, val, cls] of chips) {   // beat 3: the details, one at a time
+        const pills = [prof.job, prof.vibe, prof.looking_for, '🚩 ' + prof.dealbreaker];
+        const box = $('#ssPills');
+        for (let i = 0; i < pills.length; i++) {   // beat 3: interest pills, one at a time
           if (!live()) return;
-          const c = el('div', 'ss-chip' + cls, `<span class="lbl">${lbl}</span>${esc(val)}`);
-          c.style.animation = 'cardIn .4s both';
+          const c = el('span', 'ss-pill' + (i === 3 ? ' red' : ''), esc(pills[i]));
+          c.style.animation = 'popIn .35s both';
           if (box) box.appendChild(c);
-          await sleep(430);
+          await sleep(400);
         }
         await sleep(500);
         if (!live()) return;
@@ -3429,14 +3441,17 @@ const Player = (() => {
   const stage = () => $('#playStage');
 
   /* ---- join screen wiring ---- */
-  $('#avatarBtn').onclick = () => $('#avatarInput').click();
-  $('#avatarInput').onchange = async e => {
-    const f = e.target.files[0]; if (!f) return;
+  const avatarPicked = async f => {
+    if (!f) return;
     const { img, url } = await fileToImage(f);
     avatarData = squareDataURL(img, 220, .8);
     URL.revokeObjectURL(url);
     const pv = $('#avatarPreview'); pv.classList.add('set'); pv.innerHTML = `<img src="${avatarData}" alt="">`;
   };
+  $('#avatarBtn').onclick = () => $('#avatarInput').click();          // capture=user → opens the camera
+  $('#avatarRollBtn').onclick = () => $('#avatarRollInput').click();  // no capture → photo library
+  $('#avatarInput').onchange = e => avatarPicked(e.target.files[0]);
+  $('#avatarRollInput').onchange = e => avatarPicked(e.target.files[0]);
   $('#joinBtn').onclick = async () => {
     const err = $('#joinErr'); err.textContent = '';
     const c = $('#joinCode').value.trim().toUpperCase();
