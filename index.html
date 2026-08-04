@@ -1779,6 +1779,7 @@ const TV = (() => {
     else if (st === 'ccVote') renderCcVoteTV();
     else if (st === 'ccReveal') { if (once('ccReveal:' + room.contest.round)) playCcReveal(); }
     else if (st === 'ccFinal') { if (once('ccFinal')) renderCcFinal(); }
+    else if (st === 'ssIntro') renderSsIntroTV();
     else if (st === 'ssWrite') renderSsWriteTV();
     else if (st === 'ssJudge') { if (once('ssJudge:' + room.shoot.round)) playSsJudge(); }
     else if (st === 'ssReveal') { if (once('ssReveal:' + room.shoot.round)) playSsReveal(); }
@@ -1840,7 +1841,7 @@ const TV = (() => {
     ccb.onclick = () => startContest();
     const ssb = s.querySelector('#ssBtn');
     if (ps.length > 6) ssb.disabled = true;
-    ssb.onclick = () => startShoot();
+    ssb.onclick = () => { ssb.disabled = true; startShoot(); };
   }
 
   /* ---------- arrow-through-heart start FX ---------- */
@@ -3172,7 +3173,8 @@ const TV = (() => {
     const ps = players(), ids = ps.map(([pid]) => pid);
     const libS = await db.ref('library').once('value');
     const urls = shuffle(Object.values(libS.val() || {}).map(i => i.url));
-    if (urls.length < SS_ROUNDS) { toast(`Shoot Your Shot needs at least ${SS_ROUNDS} photos in the library.`); return; }
+    if (urls.length < SS_ROUNDS) { toast(`Shoot Your Shot needs at least ${SS_ROUNDS} photos in the library.`); const b = $('#ssBtn'); if (b) b.disabled = false; return; }
+    R().update({ state: 'ssIntro', mode: 'shoot' });   // leave the lobby NOW — profiles generate behind the intro
     playStartFx(Math.random() < .5 ? 'vo_start_1' : 'vo_start_2');
     // profiles: one AI call covers the whole game; mock bank if the function isn't live yet
     let profs = null;
@@ -3193,6 +3195,31 @@ const TV = (() => {
     R().update(r + 1 < SS_ROUNDS
       ? { state: 'ssWrite', 'shoot/round': r + 1, 'shoot/lines': null, 'shoot/result': null }
       : { state: 'ssFinal' });
+  }
+
+  const SS_INTRO_LINES = [
+    'She’s typing<span class="dots"></span>',
+    'Teaching the AI what a 401k is<span class="dots"></span>',
+    'Swiping left on your egos<span class="dots"></span>',
+    'Generating five women out of your league<span class="dots"></span>',
+    'Calibrating savagery levels<span class="dots"></span>',
+    'Her standards are loading<span class="dots"></span>'
+  ];
+  function renderSsIntroTV() {
+    stage().innerHTML = `
+      <div class="big-emoji" style="font-size:clamp(56px,10vh,120px)">😏</div>
+      <div class="tv-caption" style="font-size:clamp(32px,4.4vw,64px)">SHOOT <span class="accent">YOUR</span> SHOT</div>
+      <div class="tv-sub" id="ssIntroLine" style="font-size:clamp(16px,1.9vw,28px);min-height:1.5em;color:var(--rose);font-weight:700"></div>
+      <div class="tv-sub" style="opacity:.75;margin-top:30px">5 rounds · funniest line gets her number · worst line gets read to filth</div>`;
+    if (once('ssIntroFx')) SFX.play('whoosh');
+    let i = 0, iv = null;
+    const cycle = () => {
+      const t = $('#ssIntroLine');
+      if (!t || room.state !== 'ssIntro') { clearInterval(iv); return; }
+      t.innerHTML = SS_INTRO_LINES[i++ % SS_INTRO_LINES.length];
+    };
+    cycle();
+    iv = setInterval(cycle, 2200);
   }
 
   function renderSsWriteTV() {
@@ -3509,6 +3536,7 @@ const Player = (() => {
     else if (st === 'ccVote') renderCcVote();
     else if (st === 'ccReveal') stage().innerHTML = waitingCard('🥁', 'Results on the TV!', 'Watch who wrote what…');
     else if (st === 'ccFinal') renderCcFinalPhone();
+    else if (st === 'ssIntro') stage().innerHTML = waitingCard('😏', 'Shoot Your Shot is loading…', 'The AI is writing the profiles. Get your game face on.');
     else if (st === 'ssWrite') renderSsWrite();
     else if (st === 'ssJudge') { ssFlushDraft(); stage().innerHTML = waitingCard('💭', "She's reading every line…", 'Sweat it out.'); }
     else if (st === 'ssReveal') { ssFlushDraft(); stage().innerHTML = waitingCard('💬', 'Her answer is on the TV!', 'Somebody is getting a number…'); }
