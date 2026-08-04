@@ -574,6 +574,16 @@ input[type=text]::placeholder{color:#6E5CA8;font-weight:600}
 .cap-prompt.hero{color:var(--cream);font-size:clamp(30px,4.6vw,64px);line-height:1.12;max-width:min(1500px,94vw);
   margin-bottom:20px;text-shadow:0 4px 22px rgba(0,0,0,.55);text-wrap:balance}
 .cap-medals{font-size:13px;color:var(--muted);font-weight:800;margin-top:5px}
+.ss-profile{background:var(--ink2);border:2px solid var(--line);border-radius:20px;padding:18px 28px;max-width:min(760px,94vw);text-align:left}
+.ss-name{font-family:'Bungee';font-size:clamp(24px,3vw,42px);color:var(--cream)}
+.ss-tag{font-weight:800;font-size:clamp(14px,1.6vw,20px);color:var(--muted);margin-top:6px}
+.ss-tag b{color:var(--cream)}
+.ss-greet{margin-top:12px;font-weight:800;font-size:clamp(16px,1.9vw,26px);color:var(--rose)}
+.ss-line{background:var(--ink2);border:3px solid var(--gold);border-radius:18px;padding:16px 22px;font-weight:800;font-size:clamp(20px,2.6vw,36px);color:var(--cream);text-align:left}
+.ss-who{display:flex;align-items:center;gap:10px;margin-top:10px;font-size:clamp(14px,1.6vw,20px);font-weight:800;color:var(--muted)}
+.ss-who .pav{width:34px;height:34px;border-width:2px}
+.ss-resp{background:rgba(255,92,122,.1);border:2px solid var(--rose);border-radius:18px;padding:14px 20px;font-weight:800;font-size:clamp(17px,2.1vw,28px);color:var(--cream);text-align:left;animation:popIn .45s both}
+.ss-roast{background:var(--ink2);border:2px solid var(--line);border-radius:14px;padding:12px 18px;font-weight:800;font-size:clamp(14px,1.7vw,22px);color:var(--muted);text-align:left}
 .cap-timer{font-family:'Bungee';font-size:clamp(18px,2vw,28px);color:var(--gold);background:var(--ink2);border:1px solid var(--line);
   border-radius:999px;padding:8px 26px;margin-bottom:18px}
 .cap-write-grid{display:flex;flex-wrap:wrap;gap:clamp(18px,2.5vw,36px);justify-content:center;max-width:1700px;width:100%}
@@ -802,6 +812,7 @@ input[type=text]::placeholder{color:#6E5CA8;font-weight:600}
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-functions-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
 /* ================================================================
@@ -1065,15 +1076,19 @@ const VOICE = (() => {
     }
     return cache[name];
   }
+  function getUrl(url) {   // AI-generated voice lines (Storage mp3s) — same channel, keyed by url
+    if (!cache[url]) { const a = new Audio(url); a.preload = 'auto'; cache[url] = a; }
+    return cache[url];
+  }
   function pump() {
     if (current || SFX.isMuted()) return;
     while (q.length) {
       const item = q.shift();
       if (item.staleAfter && Date.now() > item.staleAfter) continue;   // missed its moment
-      const a = get(item.name);
+      const a = item.url ? getUrl(item.url) : get(item.name);
       current = a;
-      played[item.name] = (played[item.name] || 0) + 1;
-      recent.push(item.name);
+      played[item.name || item.url] = (played[item.name || item.url] || 0) + 1;
+      recent.push(item.name || item.url);
       if (recent.length > RECENT_MAX) recent.shift();
       SFX.setDucked(true);
       const fin = () => { if (current === a) { current = null; SFX.setDucked(false); pump(); } };
@@ -1090,6 +1105,11 @@ const VOICE = (() => {
     if (thr != null && (played[name] || 0) > 0 && Math.random() > thr) return;   // repeat-throttle: first play free, repeats scarce
     if (q.length >= MAX_Q) return;
     q.push({ name, staleAfter: Date.now() + STALE_MS });
+    pump();
+  }
+  function sayUrl(url) {   // one-shot AI voice line — waits its turn like any other
+    if (SFX.isMuted() || !url || q.length >= MAX_Q) return;
+    q.push({ url, staleAfter: Date.now() + 30000 });   // generation latency is part of the moment — allow a longer window
     pump();
   }
   function pickFresh(names) {
@@ -1114,7 +1134,7 @@ const VOICE = (() => {
   // custom packs — files staged; per-line triggers wired once specified
   const PACKS = { gabe: ['gabeone', 'gabetwo', 'gabethree', 'gabefour', 'gabefive'],
                   mark: ['markone', 'marktwo', 'markthree', 'markfour', 'markfive'] };
-  return { say, any, seq, stop, pickFresh, times, resetSession, PACKS };
+  return { say, sayUrl, any, seq, stop, pickFresh, times, resetSession, PACKS };
 })();
 
 /* ---------------- router ---------------- */
@@ -1170,6 +1190,19 @@ function fitDataURL(img, maxDim, quality) {
 }
 // contest photos can be videos too — one tag helper for every screen
 const isVid = u => /^data:video|\.(mp4|mov|webm|m4v)(\?|#|$)/i.test(u || '');
+// demo-mode voice for "her": browser speech synthesis, female-leaning voice when one exists
+function speakHer(text) {
+  try {
+    if (!('speechSynthesis' in window)) return;
+    speechSynthesis.cancel();
+    const vs = speechSynthesis.getVoices();
+    const fem = vs.find(v => /female|samantha|victoria|zira|karen|moira|tessa|fiona|serena|allison|ava|susan/i.test(v.name));
+    const u = new SpeechSynthesisUtterance(text);
+    if (fem) u.voice = fem;
+    u.rate = 1.02; u.pitch = 1.1;
+    speechSynthesis.speak(u);
+  } catch (e) {}
+}
 const mediaTag = u => isVid(u)
   ? `<video src="${u}" autoplay muted loop playsinline style="width:100%;height:100%;object-fit:cover;display:block"></video>`
   : `<img src="${u}" alt="" style="width:100%;height:100%;object-fit:cover;display:block">`;
@@ -1297,7 +1330,7 @@ const Studio = (() => {
       const list = $('#roomsList'); list.innerHTML = '';
       entries.forEach(([rc, r]) => {
         const ps = Object.entries(r.players || {}).sort((a, b) => (a[1].order || 0) - (b[1].order || 0)).map(([, p]) => p);
-        const mode = r.mode === 'caption' ? '😂 caption' : r.mode === 'showdown' ? '⚔️ showdown' : r.mode === 'contest' ? '📸 contest' : '💘 classic';
+        const mode = r.mode === 'caption' ? '😂 caption' : r.mode === 'showdown' ? '⚔️ showdown' : r.mode === 'contest' ? '📸 contest' : r.mode === 'shoot' ? '😏 shoot' : '💘 classic';
         const row = el('div', 'room-row', `
           <span class="room-code">${rc}</span>
           <span class="room-badge">${mode}</span>
@@ -1700,6 +1733,10 @@ const TV = (() => {
       const k = room.contest;
       const missing = players().filter(([pid]) => (k.votes || {})[pid] == null);
       armIdle('ccV:' + k.round, missing.length > 0, missing.length === 1 ? missing[0][0] : null);
+    } else if (st === 'ssWrite') {
+      const k = room.shoot;
+      const missing = players().filter(([pid]) => !(k.lines || {})[pid]);
+      armIdle('ssW:' + k.round, missing.length > 0, missing.length === 1 ? missing[0][0] : null);
     } else armIdle('none', false);
     // sudden-death heartbeat: only while a rematch duel is being picked
     const wantHB = st === 'sdDuel' && room.showdown && room.showdown.duel && room.showdown.duel.rematch;
@@ -1727,6 +1764,10 @@ const TV = (() => {
     else if (st === 'ccVote') renderCcVoteTV();
     else if (st === 'ccReveal') { if (once('ccReveal:' + room.contest.round)) playCcReveal(); }
     else if (st === 'ccFinal') { if (once('ccFinal')) renderCcFinal(); }
+    else if (st === 'ssWrite') renderSsWriteTV();
+    else if (st === 'ssJudge') { if (once('ssJudge:' + room.shoot.round)) playSsJudge(); }
+    else if (st === 'ssReveal') { if (once('ssReveal:' + room.shoot.round)) playSsReveal(); }
+    else if (st === 'ssFinal') { if (once('ssFinal')) renderSsFinal(); }
   }
 
   /* ---------- lobby ---------- */
@@ -1754,6 +1795,7 @@ const TV = (() => {
         <button class="btn big teal" id="sdBtn" ${ps.length < 3 ? 'disabled' : ''}>⚔️ Showdown ▶</button>
         <button class="btn big" id="capBtn" ${ps.length < 2 ? 'disabled' : ''}>😂 She's a 10 but… ▶</button>
         <button class="btn big gold" id="ccBtn" ${ps.length < 3 ? 'disabled' : ''}>📸 Caption Contest ▶</button>
+        <button class="btn big" id="ssBtn" ${ps.length < 2 ? 'disabled' : ''}>😏 Shoot Your Shot ▶</button>
       </div>
       <div class="tv-sub">${ps.length < 2 ? 'Need at least 2 players' : ps.length > 6 ? 'Max 6 players!' : ps.length + ' player' + (ps.length > 1 ? 's' : '') + ' ready' + (ps.length < 3 ? ' · Showdown & Contest need 3+' : '')}</div>`;
     if (window.QRCode) new QRCode($('#lobbyQR'), { text: location.origin + location.pathname, width: 150, height: 150, correctLevel: QRCode.CorrectLevel.M });
@@ -1781,6 +1823,9 @@ const TV = (() => {
     const ccb = s.querySelector('#ccBtn');
     if (ps.length > 6) ccb.disabled = true;
     ccb.onclick = () => startContest();
+    const ssb = s.querySelector('#ssBtn');
+    if (ps.length > 6) ssb.disabled = true;
+    ssb.onclick = () => startShoot();
   }
 
   /* ---------- arrow-through-heart start FX ---------- */
@@ -3038,6 +3083,220 @@ const TV = (() => {
     $('#ccAgainBtn').onclick = async () => { await db.ref('rooms/' + code).remove(); sessionStorage.removeItem('ht_tv'); location.reload(); };
   }
 
+  /* ================================================================
+     SHOOT YOUR SHOT — an AI girl generates a dating profile, everyone
+     types a pickup line, SHE picks the winner and answers out loud.
+     Works with zero backend: falls back to a local mock if the Cloud
+     Function isn't deployed / has no keys yet.
+  ================================================================ */
+  const SS_ROUNDS = 5, SS_WRITE_MS = 60000;
+  const SS_CONSTRAINTS = [
+    'QUESTIONS ONLY — your line must be a question.',
+    'EXACTLY SIX WORDS — she will count.',
+    'NO COMPLIMENTS — neg her or get creative.'
+  ];
+  const SS_MOCK_PROFILES = [
+    { name: 'Kaylee', age: 24, job: 'Pilates instructor', vibe: 'Will ask your sign before your name', looking_for: "A man who doesn't live with his mom", dealbreaker: 'Owns a vape', greeting: "Okay, impress me. And if you say 'hey', I'm leaving." },
+    { name: 'Brooke', age: 26, job: 'ER nurse', vibe: 'Has seen things. Rates your pain tolerance.', looking_for: 'Emotional availability and a truck', dealbreaker: 'Says "let\'s just see where this goes"', greeting: 'I just got off a 12-hour shift. Make it worth my time.' },
+    { name: 'Madison', age: 23, job: '"Entrepreneur"', vibe: 'Bio says CEO of a company with 3 followers', looking_for: 'Someone tall, obviously', dealbreaker: "Under 6 feet. She is 5'2\".", greeting: "Before you ask: yes, the business is doing great. No, you can't see the numbers." },
+    { name: 'Jess', age: 27, job: 'Third-grade teacher', vibe: 'Sweet until proven otherwise', looking_for: 'A golden retriever in human form', dealbreaker: 'Rude to waiters', greeting: "Hi! Please be normal. Please. I've had a week." },
+    { name: 'Alyssa', age: 25, job: 'Gym girl, protein affiliate', vibe: 'Will make you her content', looking_for: 'A lifting partner with benefits', dealbreaker: 'Skips leg day', greeting: "This better be good. I'm between sets." },
+    { name: 'Courtney', age: 28, job: 'Lawyer, and she will mention it', vibe: 'Cross-examines your stories', looking_for: "Someone who can win an argument. It won't be you.", dealbreaker: 'Being wrong', greeting: 'State your case. You get one shot and I bill by the hour.' },
+    { name: 'Sam', age: 24, job: 'Barista with a film degree', vibe: 'Judging your order AND your taste', looking_for: 'A man who has seen at least one A24 movie', dealbreaker: 'Says Marvel is cinema', greeting: 'Let me guess your order first. Then your personality.' },
+    { name: 'Haley', age: 22, job: 'Senior, communications major', vibe: 'Here for a good time, not a long time', looking_for: 'Concert tickets and chaos', dealbreaker: 'Wants to "stay in tonight"', greeting: 'Okay but why should I pick YOU? Be specific.' }
+  ];
+
+  // one wrapper for every AI call — null means "backend not ready", callers fall back to the mock
+  async function aiCall(name, payload, timeoutMs) {
+    try {
+      const fn = firebase.functions().httpsCallable(name);
+      const out = await Promise.race([
+        fn(payload),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('ai timeout')), timeoutMs || 20000))
+      ]);
+      return out.data || null;
+    } catch (e) { return null; }
+  }
+
+  function ssMockJudge(payload) {
+    const ls = payload.lines;
+    const winner = ls[Math.floor(Math.random() * ls.length)];
+    const others = ls.filter(l => l.pid !== winner.pid);
+    const rt = others.length ? others[Math.floor(Math.random() * others.length)] : null;
+    const snip = winner.text.length > 42 ? winner.text.slice(0, 42) + '…' : winner.text;
+    const responses = [
+      `Okay ${winner.name} — “${snip}”. That actually made me look up from my drink. You get one conversation. The rest of you, take notes.`,
+      `“${snip}”? ${winner.name}, I won't say it was smooth, but I'm still standing here. Winner.`,
+      `${winner.name} takes it. “${snip}” — bold strategy, and honestly? It worked.`
+    ];
+    return {
+      winnerPid: winner.pid, winnerText: winner.text,
+      response: responses[Math.floor(Math.random() * responses.length)],
+      roastPid: rt ? rt.pid : null,
+      roast: rt ? `${rt.name}. “${rt.text}”. ${rt.name}, I want you to sit in silence tonight and think about that choice.` : null,
+      audioUrl: null
+    };
+  }
+
+  const ssScoreStrip = () => {
+    const k = room.shoot, ps = players();
+    const max = Math.max(...ps.map(([pid]) => (k.scores || {})[pid] || 0));
+    return `<div class="score-strip">` + ps.map(([pid, p]) => {
+      const sc = (k.scores || {})[pid] || 0;
+      return `<div class="score-chip${sc === max && max > 0 ? ' lead' : ''}">${pav(p.avatar)}${esc(p.name)} · ${sc}</div>`;
+    }).join('') + `</div>`;
+  };
+  const SS_RULES = {
+    standard: 'Type your best pickup line. She reads them ALL.',
+    redflag: '⚠️ Red flag round — her profile is a minefield. Address it or ignore it, she\'ll judge either way.',
+    constraint: null,   // filled from k.constraint
+    finale: '🏆 Finale — double points. Leave it all on the field.'
+  };
+
+  async function startShoot() {
+    const ps = players(), ids = ps.map(([pid]) => pid);
+    const libS = await db.ref('library').once('value');
+    const urls = shuffle(Object.values(libS.val() || {}).map(i => i.url));
+    if (urls.length < SS_ROUNDS) { toast(`Shoot Your Shot needs at least ${SS_ROUNDS} photos in the library.`); return; }
+    playStartFx(Math.random() < .5 ? 'vo_start_1' : 'vo_start_2');
+    // profiles: one AI call covers the whole game; mock bank if the function isn't live yet
+    let profs = null;
+    const out = await aiCall('ssProfiles', { count: SS_ROUNDS }, 15000);
+    if (out && out.profiles && out.profiles.length >= SS_ROUNDS) profs = out.profiles.slice(0, SS_ROUNDS);
+    else profs = shuffle(SS_MOCK_PROFILES).slice(0, SS_ROUNDS);
+    profs = profs.map((pr, i) => ({ ...pr, photo: urls[i] }));
+    const scores = {}; ids.forEach(pid => scores[pid] = 0);
+    R().update({
+      state: 'ssWrite', mode: 'shoot',
+      shoot: { profiles: profs, round: 0, roundTypes: ['standard', 'standard', 'redflag', 'constraint', 'finale'],
+               constraint: SS_CONSTRAINTS[Math.floor(Math.random() * SS_CONSTRAINTS.length)],
+               lines: null, result: null, scores, hall: null }
+    });
+  }
+
+  function ssAdvance(r) {
+    R().update(r + 1 < SS_ROUNDS
+      ? { state: 'ssWrite', 'shoot/round': r + 1, 'shoot/lines': null, 'shoot/result': null }
+      : { state: 'ssFinal' });
+  }
+
+  function renderSsWriteTV() {
+    const k = room.shoot, ps = players(), lines = k.lines || {}, prof = k.profiles[k.round];
+    const rt = k.roundTypes[k.round];
+    const rule = rt === 'constraint' ? '🎀 ' + k.constraint : SS_RULES[rt];
+    const key = `ssW:${k.round}`;
+    if (once('snd:' + key)) {
+      SFX.play('whoosh');
+      VOICE.say(k.round === SS_ROUNDS - 1 ? 'vo_final_round' : VOICE.pickFresh(['vo_round_1', 'vo_round_2', 'vo_round_3']));
+      armCcTimer(SS_WRITE_MS, 'ssWrite', () => once('ssWTO:' + k.round) &&   // shared countdown helper
+        (Object.keys(room.shoot.lines || {}).length ? R().update({ state: 'ssJudge' }) : ssAdvance(k.round)));
+    }
+    stage().innerHTML = `
+      ${ssScoreStrip()}
+      <div class="tv-caption">😏 Round ${k.round + 1} of ${SS_ROUNDS} — shoot your shot<span class="accent">!</span></div>
+      <div class="cap-timer" id="ccTimer"></div>
+      <div class="cap-stage">
+        <div class="cap-photo">${mediaTag(prof.photo)}</div>
+        <div class="ss-profile">
+          <div class="ss-name">${esc(prof.name)}, ${prof.age}</div>
+          <div class="ss-tag">💼 <b>${esc(prof.job)}</b></div>
+          <div class="ss-tag">✨ ${esc(prof.vibe)}</div>
+          <div class="ss-tag">💘 Looking for: <b>${esc(prof.looking_for)}</b></div>
+          <div class="ss-tag">🚩 Dealbreaker: <b>${esc(prof.dealbreaker)}</b></div>
+          <div class="ss-greet">“${esc(prof.greeting)}”</div>
+        </div>
+      </div>
+      <div class="tv-sub" style="margin-top:14px">${rule}</div>
+      <div class="waiting-avatars" style="margin-top:10px">${ps.map(([pid, p]) => `<div class="wa${lines[pid] ? ' done' : ''}"><img src="${p.avatar}" alt=""></div>`).join('')}</div>`;
+    if (ps.every(([pid]) => lines[pid]) && once('ssAllIn:' + k.round)) {
+      clearCcTimer(); VOICE.say('vo_votes_locked', { throttle: .4 });
+      R().update({ state: 'ssJudge' });
+    }
+  }
+
+  async function playSsJudge() {
+    const k = room.shoot, prof = k.profiles[k.round], lines = k.lines || {};
+    stage().innerHTML = `
+      ${ssScoreStrip()}
+      <div class="tv-caption">😏 She's reading every line<span class="accent">…</span></div>
+      <div class="cap-mini" style="width:min(34vh,320px)">${mediaTag(prof.photo)}</div>
+      <div class="tv-sub">${esc(prof.name)} is judging you. All of you.<span class="dots"></span></div>`;
+    const payload = {
+      profile: { name: prof.name, age: prof.age, job: prof.job, vibe: prof.vibe, looking_for: prof.looking_for, dealbreaker: prof.dealbreaker },
+      roundType: k.roundTypes[k.round],
+      constraint: k.roundTypes[k.round] === 'constraint' ? k.constraint : null,
+      lines: Object.entries(lines).map(([pid2, text]) => ({ pid: pid2, name: (room.players[pid2] || {}).name || '???', text }))
+    };
+    let res = await aiCall('ssJudge', payload, 25000);
+    if (!res || !res.winnerPid || !lines[res.winnerPid]) res = ssMockJudge(payload);
+    if (!res.winnerText) res.winnerText = lines[res.winnerPid];
+    await R().update({ 'shoot/result': res, state: 'ssReveal' });
+  }
+
+  async function playSsReveal() {
+    const k = room.shoot, prof = k.profiles[k.round], res = k.result || {};
+    const finale = k.roundTypes[k.round] === 'finale';
+    const winner = res.winnerPid && room.players[res.winnerPid] ? res.winnerPid : null;
+    stage().innerHTML = `
+      ${ssScoreStrip()}
+      <div class="tv-caption">😏 ${esc(prof.name)} has chosen<span class="accent">!</span></div>
+      <div class="cap-stage" style="align-items:flex-start">
+        <div class="cap-photo">${mediaTag(prof.photo)}</div>
+        <div class="cap-opts" style="gap:14px;align-items:stretch;flex:none;max-width:min(900px,58vw)">
+          <div class="ss-line">“${esc(res.winnerText || '')}”
+            <div class="ss-who">${winner ? pav(room.players[winner].avatar) + `<span>${esc(room.players[winner].name)} · +${finale ? 200 : 100}</span>` : ''}</div></div>
+          <div class="ss-resp">💬 “${esc(res.response || '')}”</div>
+          <div class="ss-roast" id="ssRoast" style="display:none">${res.roast ? '🧊 ' + esc(res.roast) : ''}</div>
+        </div>
+      </div>
+      <div class="tv-sub" id="ssSub"></div>`;
+    if (res.audioUrl) VOICE.sayUrl(res.audioUrl);   // her real voice (ElevenLabs mp3)
+    else speakHer(res.response || '');              // demo mode: browser voice
+    await sleep(2800);
+    if (res.roast) { $('#ssRoast').style.display = ''; SFX.play('thump'); }
+    $('#ssSub').innerHTML = winner
+      ? `<b style="color:var(--gold)">${esc(room.players[winner].name)}</b> gets her number${finale ? ' — double points!' : '!'}`
+      : 'She left. Nobody wins.';
+    const u = {};
+    if (winner) {
+      u[`shoot/scores/${winner}`] = ((k.scores || {})[winner] || 0) + (finale ? 200 : 100);
+      u['shoot/hall'] = [...(k.hall || []), { pid: winner, text: res.winnerText || '', prof: prof.name }];
+    }
+    await sleep(3600);
+    if (k.round + 1 < SS_ROUNDS) {
+      await R().update({ ...u, state: 'ssWrite', 'shoot/round': k.round + 1, 'shoot/lines': null, 'shoot/result': null });
+    } else {
+      await R().update({ ...u, state: 'ssFinal' });
+    }
+  }
+
+  function renderSsFinal() {
+    const k = room.shoot;
+    const ranked = players().map(([pid, p]) => [pid, p, (k.scores || {})[pid] || 0]).sort((a, b) => b[2] - a[2]);
+    confettiBurst(140);
+    SFX.play('fanfare');
+    VOICE.say('vo_showcase');
+    const pods = ranked.map(([pid, p, sc], i) => `
+      <div class="sd-pod card${i === 0 ? ' first' : ''}" style="animation-delay:${i * .15}s">
+        ${i === 0 ? '<div class="crown">👑</div>' : ''}
+        ${pav(p.avatar)}<b>${esc(p.name)}</b><span class="pts">${sc} pt${sc === 1 ? '' : 's'}</span>
+      </div>`).join('');
+    const hall = (k.hall || []).map((h, i) => h && room.players[h.pid] ? `
+      <div class="cap-entry" style="animation-delay:${.6 + i * .12}s">
+        <div class="cap-txt">“${esc(h.text)}”<div class="cap-medals">${esc(h.prof)} couldn't resist</div></div>
+        <div class="cap-who">${pav(room.players[h.pid].avatar)}</div></div>` : '').join('');
+    stage().innerHTML = `
+      <div class="awards-scroll"><div class="awards-inner">
+        <div class="tv-caption">😏 Smoothest man alive<span class="accent">!</span></div>
+        <div class="tv-sub" style="margin:0 0 20px"><b style="color:var(--gold);font-size:1.3em">${esc(ranked[0][1].name)}</b> got the most numbers tonight.</div>
+        <div class="sd-podium">${pods}</div>
+        ${hall ? `<div class="tv-sub" style="margin:22px 0 10px">Her favorites of the night:</div>
+        <div class="cap-opts" style="gap:12px;align-items:stretch;width:min(1100px,94vw);flex:none">${hall}</div>` : ''}
+        <div class="tv-sub" style="margin-top:26px"><button class="btn ghost" id="ssAgainBtn">🔁 New game</button></div>
+      </div></div>`;
+    $('#ssAgainBtn').onclick = async () => { await db.ref('rooms/' + code).remove(); sessionStorage.removeItem('ht_tv'); location.reload(); };
+  }
+
   return { init };
 })();
 
@@ -3137,7 +3396,7 @@ const Player = (() => {
       b.predictions && b.predictions[pid] != null,
       sd.duelIdx, d.rematch, !!(sd.kept && sd.kept[pid]), !!(d.cards && d.cards[pid]), d.votes && d.votes[pid] != null,
       (room.caption || {}).round, (room.caption || {}).matchupIdx, !!(room.caption || {}).finale, capSelfKey(),
-      (room.contest || {}).round, ccSelfKey()].join('|');
+      (room.contest || {}).round, ccSelfKey(), (room.shoot || {}).round, ssSelfKey()].join('|');
     if (key === lastKey) return;
     lastKey = key;
     // caption-mode self status for the dedupe key
@@ -3163,6 +3422,12 @@ const Player = (() => {
       if (room.state === 'ccVote') return (k.votes || {})[pid] != null ? 1 : 0;
       return 0;
     }
+    // shoot-mode self status for the dedupe key
+    function ssSelfKey() {
+      const k = room.shoot || {};
+      if (room.state === 'ssWrite') return (k.lines || {})[pid] ? 1 : 0;
+      return 0;
+    }
     const st = room.state;
     if (st === 'lobby') renderLobby();
     else if (st === 'vote') renderVote();
@@ -3186,6 +3451,10 @@ const Player = (() => {
     else if (st === 'ccVote') renderCcVote();
     else if (st === 'ccReveal') stage().innerHTML = waitingCard('🥁', 'Results on the TV!', 'Watch who wrote what…');
     else if (st === 'ccFinal') renderCcFinalPhone();
+    else if (st === 'ssWrite') renderSsWrite();
+    else if (st === 'ssJudge') stage().innerHTML = waitingCard('💭', "She's reading every line…", 'Sweat it out.');
+    else if (st === 'ssReveal') stage().innerHTML = waitingCard('💬', 'Her answer is on the TV!', 'Somebody is getting a number…');
+    else if (st === 'ssFinal') renderSsFinalPhone();
   }
 
   function renderAwardsWatch() {
@@ -3773,6 +4042,38 @@ const Player = (() => {
       <div class="status-card card">
       <h3>${champ ? 'Caption champion!' : 'Game over'}</h3>
       <p>You finished with <b style="color:var(--gold)">${myScore} point${myScore === 1 ? '' : 's'}</b>${champ ? ' — the room loves you!' : '.'}</p></div>`;
+  }
+
+  /* ---- Shoot Your Shot ---- */
+  function renderSsWrite() {
+    const k = room.shoot;
+    if ((k.lines || {})[pid]) { stage().innerHTML = waitingCard('😏', 'Line sent!', "She's reading them all — good luck."); return; }
+    const prof = k.profiles[k.round], rt = k.roundTypes[k.round];
+    const rule = rt === 'constraint' ? '🎀 ' + k.constraint
+      : rt === 'redflag' ? '⚠️ Red flag round — her profile is a minefield. Tread carefully.'
+      : rt === 'finale' ? '🏆 Finale — double points. Leave it all on the field.'
+      : 'Type your best pickup line.';
+    stage().innerHTML = `
+      <div class="phone-title" style="color:var(--rose)">😏 ${esc(prof.name)}, ${prof.age}</div>
+      <div class="cap-mini">${mediaTag(prof.photo)}</div>
+      <div class="phone-sub" style="margin-bottom:4px">💼 ${esc(prof.job)} · 🚩 ${esc(prof.dealbreaker)}</div>
+      <div class="phone-sub" style="margin-bottom:12px;color:var(--gold)">${rule}</div>
+      <textarea class="cap-ta" id="ssTa" maxlength="80" placeholder="your pickup line… (80 chars)"></textarea>
+      <button class="btn big" id="ssGo" style="width:100%;margin-top:12px" disabled>Send it ▶</button>`;
+    const ta = $('#ssTa'), btn = $('#ssGo');
+    ta.oninput = () => { btn.disabled = !ta.value.trim(); };
+    btn.onclick = () => { const t = ta.value.trim(); if (t) { btn.disabled = true; R().child('shoot/lines/' + pid).set(t); } };
+  }
+
+  function renderSsFinalPhone() {
+    const k = room.shoot;
+    const myScore = (k.scores || {})[pid] || 0;
+    const ranked = Object.entries(k.scores || {}).sort((a, b) => b[1] - a[1]);
+    const champ = ranked[0] && ranked[0][0] === pid;
+    stage().innerHTML = `<div class="big-emoji">${champ ? '👑' : '😏'}</div>
+      <div class="status-card card">
+      <h3>${champ ? 'Smoothest man alive!' : 'Game over'}</h3>
+      <p>You finished with <b style="color:var(--gold)">${myScore} point${myScore === 1 ? '' : 's'}</b>${champ ? ' — they never stood a chance!' : '.'}</p></div>`;
   }
 
   /* ---- shareable recap card (canvas → PNG) ---- */
