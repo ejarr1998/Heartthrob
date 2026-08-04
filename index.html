@@ -594,6 +594,7 @@ input[type=text]::placeholder{color:#6E5CA8;font-weight:600}
 .cap-pick.chosen{border-color:var(--gold);box-shadow:0 0 0 3px rgba(255,194,75,.3)}
 .cap-mini{width:min(60vw,240px);aspect-ratio:1/1;border-radius:16px;overflow:hidden;background:var(--ink3);border:3px solid var(--line);margin:0 auto 12px}
 .cap-mini img{width:100%;height:100%;object-fit:cover}
+.draft-card video,.cap-mini video,.cap-photo video,.award-photo video{width:100%;height:100%;object-fit:cover;display:block}
 
 /* studio — active lobbies admin */
 .room-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--ink3);border:1px solid var(--line);border-radius:14px;padding:12px 16px;margin-top:10px}
@@ -1160,6 +1161,18 @@ function squareDataURL(img, size, quality) {
   ctx.drawImage(img, (img.naturalWidth - m) / 2, (img.naturalHeight - m) / 2, m, m, 0, 0, size, size);
   return c.toDataURL('image/jpeg', quality);
 }
+// aspect-preserving compress for camera-roll uploads (keeps RTDB writes small)
+function fitDataURL(img, maxDim, quality) {
+  const w = img.naturalWidth, h = img.naturalHeight, sc = Math.min(1, maxDim / Math.max(w, h));
+  const c = document.createElement('canvas'); c.width = Math.round(w * sc); c.height = Math.round(h * sc);
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+  return c.toDataURL('image/jpeg', quality);
+}
+// contest photos can be videos too — one tag helper for every screen
+const isVid = u => /^data:video|\.(mp4|mov|webm|m4v)(\?|#|$)/i.test(u || '');
+const mediaTag = u => isVid(u)
+  ? `<video src="${u}" autoplay muted loop playsinline style="width:100%;height:100%;object-fit:cover;display:block"></video>`
+  : `<img src="${u}" alt="" style="width:100%;height:100%;object-fit:cover;display:block">`;
 
 /* ================================================================
    CROP TOOL  (square crop, drag to pan, slider/pinch to zoom)
@@ -2811,7 +2824,7 @@ const TV = (() => {
     const best = c.best;
     const bestCard = best ? `
       <div class="award-card card" style="margin-top:26px;animation-delay:.6s"><div class="award-emoji">🏆</div>
-        <div class="award-photo"><img src="${best.photo}" alt=""></div>
+        <div class="award-photo">${mediaTag(best.photo)}</div>
         <h3>Caption of the Night</h3>
         <p style="font-size:15px;color:var(--cream)">“${esc(best.text)}”</p>
         <div class="award-name">${esc(room.players[best.pid].name)} · ${best.votes} vote${best.votes === 1 ? '' : 's'}</div></div>` : '';
@@ -2916,7 +2929,7 @@ const TV = (() => {
       ${ccScoreStrip()}
       <div class="tv-caption">📸 Round ${k.round + 1} of ${CC_ROUNDS} — caption it<span class="accent">!</span></div>
       <div class="cap-timer" id="ccTimer"></div>
-      <div class="cap-photo" style="width:min(52vh,80vw);margin:0 auto"><img src="${(k.photos || [])[k.round]}" alt=""></div>
+      <div class="cap-photo" style="width:min(52vh,80vw);margin:0 auto">${mediaTag((k.photos || [])[k.round])}</div>
       <div class="waiting-avatars" style="margin-top:18px">${ps.map(([pid, p]) => `<div class="wa${caps[pid] ? ' done' : ''}"><img src="${p.avatar}" alt=""></div>`).join('')}</div>`;
     if (ps.every(([pid]) => caps[pid]) && once('ccAllIn:' + k.round)) { clearCcTimer(); VOICE.say('vo_votes_locked', { throttle: .4 }); ccWriteDone(); }
   }
@@ -2934,7 +2947,7 @@ const TV = (() => {
         <div class="tv-caption">📸 Round ${k.round + 1} — vote<span class="accent">!</span></div>
         <div class="cap-timer" id="ccTimer"></div>
         <div class="cap-stage">
-          <div class="cap-photo"><img src="${(k.photos || [])[k.round]}" alt=""></div>
+          <div class="cap-photo">${mediaTag((k.photos || [])[k.round])}</div>
           <div class="cap-opts">${caps.map(([cpid, t]) => `<div class="cap-opt">${esc(t)}</div>`).join('')}</div>
         </div>
         <div class="tv-sub">Phones: pick the funniest — never your own 👀</div>
@@ -2963,7 +2976,7 @@ const TV = (() => {
       ${ccScoreStrip()}
       <div class="tv-caption">📸 Round ${k.round + 1} — results<span class="accent">!</span></div>
       <div class="cap-stage" style="align-items:flex-start">
-        <div class="cap-photo"><img src="${(k.photos || [])[k.round]}" alt=""></div>
+        <div class="cap-photo">${mediaTag((k.photos || [])[k.round])}</div>
         <div class="cap-opts" id="ccEntries" style="gap:12px;align-items:stretch;flex:none">
           ${entries.map((e2, i) => `<div class="cap-entry${e2.n === topN && topN > 0 ? ' first' : ''}" style="animation-delay:${i * .3}s">
             <div class="cap-vc">${e2.n * 100}</div><div class="cap-txt">${esc(e2.text)}</div><div class="cap-who"></div></div>`).join('')}
@@ -3010,7 +3023,7 @@ const TV = (() => {
     const best = k.best;
     const bestCard = best && room.players[best.pid] ? `
       <div class="award-card card" style="margin-top:26px;animation-delay:.6s"><div class="award-emoji">🏆</div>
-        <div class="award-photo"><img src="${best.photo}" alt=""></div>
+        <div class="award-photo">${mediaTag(best.photo)}</div>
         <h3>Caption of the Night</h3>
         <p style="font-size:15px;color:var(--cream)">“${esc(best.text)}”</p>
         <div class="award-name">${esc(room.players[best.pid].name)} · ${best.votes} vote${best.votes === 1 ? '' : 's'}</div></div>` : '';
@@ -3561,7 +3574,7 @@ const Player = (() => {
     stage().innerHTML = `
       <div class="phone-title" style="color:var(--rose)">😂 Be funny</div>
       ${tag ? `<div class="phone-sub" style="margin-bottom:8px;color:var(--gold)">${esc(tag)}</div>` : ''}
-      <div class="cap-mini"><img src="${photo}" alt=""></div>
+      <div class="cap-mini">${mediaTag(photo)}</div>
       <div class="phone-sub" style="margin-bottom:12px">${esc(prompt)}</div>
       <textarea class="cap-ta" id="capTa" maxlength="80" placeholder="your caption… (80 chars)"></textarea>
       <button class="btn big" id="capGo" style="width:100%;margin-top:12px" disabled>Submit ▶</button>`;
@@ -3660,34 +3673,68 @@ const Player = (() => {
 
   /* ---- Caption Contest ---- */
   const CC_TOTAL = 10;
-  let ccPickSel = [], ccBallotKey = '', ccBallot = [];
+  let ccPickSel = [], ccBallotKey = '', ccBallot = [], ccUploads = [];
   function renderCcPick() {
     const k = room.contest;
     if ((k.picks || {})[pid]) { stage().innerHTML = waitingCard('🃏', 'Photos locked in!', 'Waiting for the others…'); return; }
     const pool = (k.pools || {})[pid] || [], need = k.pickCount || 2;
     ccPickSel = ccPickSel.filter(u => pool.includes(u));
+    const total = ccPickSel.length + ccUploads.length;
     stage().innerHTML = `
       <div class="phone-title" style="color:var(--gold)">📸 Pick ${need} photo${need > 1 ? 's' : ''}</div>
-      <div class="phone-sub">The whole room captions YOUR picks — choose wisely</div>
+      <div class="phone-sub">The whole room captions YOUR picks — choose from the deck or add your own 📁</div>
       <div class="draft-grid" id="ccGrid"></div>
+      <button class="btn ghost" id="ccUpBtn" style="width:100%;margin:10px 0">📁 Add from camera roll${ccUploads.length ? ` (${ccUploads.length} added)` : ''}</button>
+      <input type="file" id="ccFile" accept="image/*,video/*" multiple style="display:none">
       <button class="btn big gold" id="ccGo" style="width:100%" disabled>Pick ${need} to continue</button>`;
     const g = $('#ccGrid');
+    // camera-roll uploads are always part of the deck — tap one to remove it
+    ccUploads.forEach((u2, ui) => {
+      const card = el('div', 'draft-card sel', mediaTag(u2));
+      card.onclick = () => { ccUploads.splice(ui, 1); renderCcPick(); };
+      g.appendChild(card);
+    });
     pool.forEach(url => {
       const sel = ccPickSel.includes(url);
-      const full = ccPickSel.length >= need;
+      const full = total >= need;
       const card = el('div', 'draft-card' + (sel ? ' sel' : full ? ' dim' : ''), `<img src="${url}" alt="">`);
       card.onclick = () => {
         if (ccPickSel.includes(url)) ccPickSel = ccPickSel.filter(u => u !== url);
-        else if (ccPickSel.length < need) ccPickSel.push(url);
+        else if (ccPickSel.length + ccUploads.length < need) ccPickSel.push(url);
         if (navigator.vibrate) navigator.vibrate(10);
         renderCcPick();
       };
       g.appendChild(card);
     });
+    const upBtn = $('#ccUpBtn'), fi = $('#ccFile');
+    upBtn.onclick = () => fi.click();
+    fi.onchange = async () => {
+      const files = [...fi.files];
+      fi.value = '';
+      if (!files.length) return;
+      upBtn.disabled = true;
+      for (const f of files) {
+        if (ccUploads.length + ccPickSel.length >= need) { toast(`That's ${need} — remove one to add another.`); break; }
+        upBtn.textContent = 'Uploading…';
+        try {
+          if (f.type.startsWith('video/')) {
+            if (f.size > 30 * 1024 * 1024) { toast('Video too big (30MB max) — trim it first.'); continue; }
+            const clean = f.name.replace(/[^\w.]/g, '').slice(-40);
+            const snap = await store.ref(`uploads/${code}/${pid}/${Date.now()}_${clean}`).put(f);
+            ccUploads.push(await snap.ref.getDownloadURL());
+          } else {
+            const { img, url } = await fileToImage(f);
+            ccUploads.push(fitDataURL(img, 1080, .82));   // compressed data URI — no storage round-trip
+            URL.revokeObjectURL(url);
+          }
+        } catch (e) { toast('Upload failed — try another one.'); }
+      }
+      renderCcPick();
+    };
     const btn = $('#ccGo');
-    btn.disabled = ccPickSel.length < need;
-    if (ccPickSel.length >= need) btn.textContent = 'Lock them in ▶';
-    btn.onclick = () => { if (ccPickSel.length >= need) { btn.disabled = true; R().child('contest/picks/' + pid).set(ccPickSel); } };
+    btn.disabled = total < need;
+    if (total >= need) btn.textContent = 'Lock them in ▶';
+    btn.onclick = () => { if (ccPickSel.length + ccUploads.length >= need) { btn.disabled = true; R().child('contest/picks/' + pid).set(ccPickSel.concat(ccUploads)); } };
   }
 
   function renderCcWrite() {
@@ -3707,7 +3754,7 @@ const Player = (() => {
     if (!ccBallot.length) { stage().innerHTML = waitingCard('😴', 'Nothing to vote on', 'Watch the TV…'); return; }
     stage().innerHTML = `
       <div class="phone-title" style="color:var(--gold)">📸 Pick the funniest</div>
-      <div class="cap-mini"><img src="${(k.photos || [])[k.round]}" alt=""></div>
+      <div class="cap-mini">${mediaTag((k.photos || [])[k.round])}</div>
       <div class="phone-sub">Not your own — nice try.</div>
       <div style="margin-top:8px">${ccBallot.map(([cpid, t]) => `<button class="cap-pick" data-k="${esc(cpid)}">${esc(t)}</button>`).join('')}</div>`;
     stage().querySelectorAll('.cap-pick').forEach(b2 => b2.onclick = () => {
