@@ -1284,7 +1284,7 @@ const Studio = (() => {
       const list = $('#roomsList'); list.innerHTML = '';
       entries.forEach(([rc, r]) => {
         const ps = Object.entries(r.players || {}).sort((a, b) => (a[1].order || 0) - (b[1].order || 0)).map(([, p]) => p);
-        const mode = r.mode === 'caption' ? '😂 caption' : r.mode === 'showdown' ? '⚔️ showdown' : '💘 classic';
+        const mode = r.mode === 'caption' ? '😂 caption' : r.mode === 'showdown' ? '⚔️ showdown' : r.mode === 'contest' ? '📸 contest' : '💘 classic';
         const row = el('div', 'room-row', `
           <span class="room-code">${rc}</span>
           <span class="room-badge">${mode}</span>
@@ -1676,6 +1676,17 @@ const TV = (() => {
       const votes = c.finale ? (c.finaleVotes || {}) : (m.votes || {});
       const missing = players().filter(([pid]) => (c.finale || (pid !== m.a && pid !== m.b)) && votes[pid] == null);
       armIdle('capV:' + c.round + ':' + c.matchupIdx + ':' + (c.finale ? 'F' : ''), missing.length > 0, missing.length === 1 ? missing[0][0] : null);
+    } else if (st === 'ccPick') {
+      const missing = players().filter(([pid]) => !((room.contest || {}).picks || {})[pid]);
+      armIdle('ccPick', missing.length > 0, missing.length === 1 ? missing[0][0] : null);
+    } else if (st === 'ccWrite') {
+      const k = room.contest;
+      const missing = players().filter(([pid]) => !(k.caps || {})[pid]);
+      armIdle('ccW:' + k.round, missing.length > 0, missing.length === 1 ? missing[0][0] : null);
+    } else if (st === 'ccVote') {
+      const k = room.contest;
+      const missing = players().filter(([pid]) => (k.votes || {})[pid] == null);
+      armIdle('ccV:' + k.round, missing.length > 0, missing.length === 1 ? missing[0][0] : null);
     } else armIdle('none', false);
     // sudden-death heartbeat: only while a rematch duel is being picked
     const wantHB = st === 'sdDuel' && room.showdown && room.showdown.duel && room.showdown.duel.rematch;
@@ -1698,6 +1709,11 @@ const TV = (() => {
     else if (st === 'capVote') renderCapVoteTV();
     else if (st === 'capReveal') { if (once('capReveal:' + room.caption.round + ':' + room.caption.matchupIdx + ':' + (room.caption.finale ? 'F' : ''))) playCapReveal(); }
     else if (st === 'capFinal') { if (once('capFinal')) renderCapFinal(); }
+    else if (st === 'ccPick') renderCcPickTV();
+    else if (st === 'ccWrite') renderCcWriteTV();
+    else if (st === 'ccVote') renderCcVoteTV();
+    else if (st === 'ccReveal') { if (once('ccReveal:' + room.contest.round)) playCcReveal(); }
+    else if (st === 'ccFinal') { if (once('ccFinal')) renderCcFinal(); }
   }
 
   /* ---------- lobby ---------- */
@@ -1724,8 +1740,9 @@ const TV = (() => {
         <button class="btn big gold" id="startBtn" ${ps.length < 2 ? 'disabled' : ''}>💘 Find Your Type ▶</button>
         <button class="btn big teal" id="sdBtn" ${ps.length < 3 ? 'disabled' : ''}>⚔️ Showdown ▶</button>
         <button class="btn big" id="capBtn" ${ps.length < 2 ? 'disabled' : ''}>😂 She's a 10 but… ▶</button>
+        <button class="btn big gold" id="ccBtn" ${ps.length < 3 ? 'disabled' : ''}>📸 Caption Contest ▶</button>
       </div>
-      <div class="tv-sub">${ps.length < 2 ? 'Need at least 2 players' : ps.length > 6 ? 'Max 6 players!' : ps.length + ' player' + (ps.length > 1 ? 's' : '') + ' ready' + (ps.length < 3 ? ' · Showdown needs 3+' : '')}</div>`;
+      <div class="tv-sub">${ps.length < 2 ? 'Need at least 2 players' : ps.length > 6 ? 'Max 6 players!' : ps.length + ' player' + (ps.length > 1 ? 's' : '') + ' ready' + (ps.length < 3 ? ' · Showdown & Contest need 3+' : '')}</div>`;
     if (window.QRCode) new QRCode($('#lobbyQR'), { text: location.origin + location.pathname, width: 150, height: 150, correctLevel: QRCode.CorrectLevel.M });
     const g = s.querySelector('#lobbyGrid');
     if (!ps.length) g.innerHTML = '<div class="empty-slots">Waiting for the first brave soul<span class="dots"></span></div>';
@@ -1748,6 +1765,9 @@ const TV = (() => {
     const capb = s.querySelector('#capBtn');
     if (ps.length > 6) capb.disabled = true;
     capb.onclick = () => startCaption();
+    const ccb = s.querySelector('#ccBtn');
+    if (ps.length > 6) ccb.disabled = true;
+    ccb.onclick = () => startContest();
   }
 
   /* ---------- arrow-through-heart start FX ---------- */
@@ -2806,6 +2826,205 @@ const TV = (() => {
     $('#capAgainBtn').onclick = async () => { await db.ref('rooms/' + code).remove(); sessionStorage.removeItem('ht_tv'); location.reload(); };
   }
 
+  /* ================================================================
+     CAPTION CONTEST — players pick the photos, then 10 rounds of:
+     one photo on TV → EVERYONE captions it → everyone votes (never
+     their own) → 100 pts per vote. Champion + Caption of the Night.
+  ================================================================ */
+  const CC_ROUNDS = 10, CC_WRITE_MS = 60000, CC_VOTE_MS = 45000, CC_PICK_MS = 60000;
+  let ccTimerInt = null, ccVoteKey = '';
+  function clearCcTimer() { if (ccTimerInt) { clearInterval(ccTimerInt); ccTimerInt = null; } }
+  function armCcTimer(ms, state, onZero) {
+    clearCcTimer();
+    const dl = Date.now() + ms;
+    ccTimerInt = setInterval(() => {
+      if (!room || room.state !== state) return clearCcTimer();
+      const t = $('#ccTimer');
+      if (t) {
+        const left = Math.max(0, Math.ceil((dl - Date.now()) / 1000));
+        t.textContent = left + 's';
+        if (left <= 10) t.style.color = 'var(--rose)';
+      }
+      if (Date.now() >= dl) { clearCcTimer(); onZero(); }
+    }, 250);
+  }
+  const ccScoreStrip = () => {
+    const k = room.contest, ps = players();
+    const max = Math.max(...ps.map(([pid]) => (k.scores || {})[pid] || 0));
+    return `<div class="score-strip">` + ps.map(([pid, p]) => {
+      const sc = (k.scores || {})[pid] || 0;
+      return `<div class="score-chip${sc === max && max > 0 ? ' lead' : ''}">${pav(p.avatar)}${esc(p.name)} · ${sc}</div>`;
+    }).join('') + `</div>`;
+  };
+  const ccAdvance = r => R().update(r + 1 < CC_ROUNDS
+    ? { state: 'ccWrite', 'contest/round': r + 1, 'contest/caps': null, 'contest/votes': null }
+    : { state: 'ccFinal' });
+
+  async function startContest() {
+    const ps = players(), ids = ps.map(([pid]) => pid);
+    const libS = await db.ref('library').once('value');
+    const urls = shuffle(Object.values(libS.val() || {}).map(i => i.url));
+    const pickCount = Math.ceil(CC_ROUNDS / ids.length);   // 3p→4, 4p→3, 5-6p→2 — always ≥10 photos in the deck
+    const poolSize = Math.min(18, Math.floor(urls.length / ids.length));
+    if (poolSize < pickCount) { toast(`Caption Contest needs at least ${ids.length * pickCount} photos in the library (you have ${urls.length}).`); return; }
+    const pools = {};
+    ids.forEach((pid, i) => pools[pid] = urls.slice(i * poolSize, (i + 1) * poolSize));
+    const scores = {}; ids.forEach(pid => scores[pid] = 0);
+    playStartFx(Math.random() < .5 ? 'vo_start_1' : 'vo_start_2');
+    R().update({
+      state: 'ccPick', mode: 'contest',
+      contest: { pickCount, pools, picks: null, photos: null, round: 0, caps: null, votes: null, scores, best: null }
+    });
+  }
+
+  function ccPicksDone() {
+    const k = room.contest, picks = { ...(k.picks || {}) };
+    // failsafe: anyone who flaked on picking gets a random selection from their pool
+    players().forEach(([pid]) => {
+      if (!(picks[pid] || []).length) picks[pid] = shuffle((k.pools || {})[pid] || []).slice(0, k.pickCount);
+    });
+    const photos = shuffle(players().flatMap(([pid]) => picks[pid] || [])).slice(0, CC_ROUNDS);
+    R().update({ 'contest/picks': picks, 'contest/photos': photos, state: 'ccWrite', 'contest/round': 0, 'contest/caps': null, 'contest/votes': null });
+  }
+
+  function renderCcPickTV() {
+    const k = room.contest, ps = players();
+    if (once('snd:ccPick')) { SFX.play('whoosh'); armCcTimer(CC_PICK_MS, 'ccPick', () => once('ccPickTO') && ccPicksDone()); }
+    stage().innerHTML = `
+      <div class="tv-caption">📸 Stock the deck<span class="accent">!</span></div>
+      <div class="cap-timer" id="ccTimer"></div>
+      <div class="tv-sub" style="margin:0 0 20px">Everyone picks <b style="color:var(--cream)">${k.pickCount}</b> photo${k.pickCount > 1 ? 's' : ''} on their phone — the room will caption YOUR choices. 10 rounds.</div>
+      <div class="waiting-avatars">${ps.map(([pid, p]) => `<div class="wa${(k.picks || {})[pid] ? ' done' : ''}"><img src="${p.avatar}" alt=""></div>`).join('')}</div>`;
+    if (ps.every(([pid]) => (k.picks || {})[pid]) && once('ccPicksIn')) { clearCcTimer(); VOICE.say('vo_votes_locked', { throttle: .4 }); ccPicksDone(); }
+  }
+
+  function ccWriteDone() {
+    const k = room.contest, caps = k.caps || {};
+    if (Object.keys(caps).length < 2) { toast('Not enough captions — skipping the round.'); ccAdvance(k.round); return; }
+    R().update({ state: 'ccVote' });
+  }
+
+  function renderCcWriteTV() {
+    const k = room.contest, ps = players(), caps = k.caps || {};
+    const key = `ccW:${k.round}`;
+    if (once('snd:' + key)) {
+      SFX.play('whoosh');
+      VOICE.say(k.round === CC_ROUNDS - 1 ? 'vo_final_round' : VOICE.pickFresh(['vo_round_1', 'vo_round_2', 'vo_round_3']));
+      armCcTimer(CC_WRITE_MS, 'ccWrite', () => once('ccWTO:' + k.round) && ccWriteDone());
+    }
+    stage().innerHTML = `
+      ${ccScoreStrip()}
+      <div class="tv-caption">📸 Round ${k.round + 1} of ${CC_ROUNDS} — caption it<span class="accent">!</span></div>
+      <div class="cap-timer" id="ccTimer"></div>
+      <div class="cap-photo" style="width:min(52vh,80vw);margin:0 auto"><img src="${(k.photos || [])[k.round]}" alt=""></div>
+      <div class="waiting-avatars" style="margin-top:18px">${ps.map(([pid, p]) => `<div class="wa${caps[pid] ? ' done' : ''}"><img src="${p.avatar}" alt=""></div>`).join('')}</div>`;
+    if (ps.every(([pid]) => caps[pid]) && once('ccAllIn:' + k.round)) { clearCcTimer(); VOICE.say('vo_votes_locked', { throttle: .4 }); ccWriteDone(); }
+  }
+
+  function renderCcVoteTV() {
+    const k = room.contest, caps = Object.entries(k.caps || {}), votes = k.votes || {};
+    const key = `ccV:${k.round}`;
+    if (ccVoteKey !== key) {
+      ccVoteKey = key;
+      renderCcVoteTV._prev = 0;
+      if (once('snd:' + key)) SFX.play('whoosh');
+      armCcTimer(CC_VOTE_MS, 'ccVote', () => once('ccVTO:' + k.round) && R().update({ state: 'ccReveal' }));
+      stage().innerHTML = `
+        ${ccScoreStrip()}
+        <div class="tv-caption">📸 Round ${k.round + 1} — vote<span class="accent">!</span></div>
+        <div class="cap-timer" id="ccTimer"></div>
+        <div class="cap-stage">
+          <div class="cap-photo"><img src="${(k.photos || [])[k.round]}" alt=""></div>
+          <div class="cap-opts">${caps.map(([cpid, t]) => `<div class="cap-opt">${esc(t)}</div>`).join('')}</div>
+        </div>
+        <div class="tv-sub">Phones: pick the funniest — never your own 👀</div>
+        <div class="sd-voters" id="ccVoters"></div>`;
+    }
+    const w = $('#ccVoters'); w.innerHTML = '';
+    let lc = 0;
+    players().forEach(([pid, p]) => {
+      const doneV = votes[pid] != null; if (doneV) lc++;
+      w.appendChild(el('div', 'wa' + (doneV ? ' done' : ''), `<img src="${p.avatar}" alt="">`));
+    });
+    if (lc > (renderCcVoteTV._prev || 0)) SFX.play('lock');
+    renderCcVoteTV._prev = lc;
+    if (players().length && players().every(([pid]) => votes[pid] != null) && once('ccAllV:' + k.round)) {
+      clearCcTimer();
+      R().update({ state: 'ccReveal' });
+    }
+  }
+
+  async function playCcReveal() {
+    const k = room.contest, caps = k.caps || {}, votes = k.votes || {};
+    const entries = Object.entries(caps).map(([cpid, text]) => ({ cpid, text, n: Object.values(votes).filter(v => v === cpid).length }))
+      .sort((x, y) => y.n - x.n);
+    const topN = entries.length ? entries[0].n : 0;
+    stage().innerHTML = `
+      ${ccScoreStrip()}
+      <div class="tv-caption">📸 Round ${k.round + 1} — results<span class="accent">!</span></div>
+      <div class="cap-stage" style="align-items:flex-start">
+        <div class="cap-photo"><img src="${(k.photos || [])[k.round]}" alt=""></div>
+        <div class="cap-opts" id="ccEntries" style="gap:12px;align-items:stretch;flex:none">
+          ${entries.map((e2, i) => `<div class="cap-entry${e2.n === topN && topN > 0 ? ' first' : ''}" style="animation-delay:${i * .3}s">
+            <div class="cap-vc">${e2.n * 100}</div><div class="cap-txt">${esc(e2.text)}</div><div class="cap-who"></div></div>`).join('')}
+        </div>
+      </div>
+      <div class="tv-sub" id="ccSub"></div>`;
+    await sleep(500);
+    const whos = document.querySelectorAll('#ccEntries .cap-who');
+    for (let i = 0; i < entries.length; i++) {
+      const p2 = room.players[entries[i].cpid];
+      if (whos[i] && p2) whos[i].innerHTML = pav(p2.avatar);
+      if (i % 2 === 0) SFX.play('stamp');
+      await sleep(350);
+    }
+    const u = {};
+    entries.forEach(e2 => { if (e2.n) u[`contest/scores/${e2.cpid}`] = ((k.scores || {})[e2.cpid] || 0) + e2.n * 100; });
+    const voterCount = Object.keys(votes).length;
+    const sweep = topN > 0 && topN === voterCount && voterCount >= 2;
+    if (sweep) { megaSplash('UNANIMOUS!'); SFX.play('fanfare'); confettiBurst(50); VOICE.say('vo_unanimous'); }
+    else if (topN > 0) { SFX.play('win'); VOICE.say(VOICE.pickFresh(['vo_win_1', 'vo_win_2', 'vo_win_3']), { throttle: .5 }); }
+    const top = entries.find(e2 => e2.n > 0);
+    if (top && top.n > ((k.best || {}).votes || 0)) u['contest/best'] = { text: top.text, votes: top.n, pid: top.cpid, photo: (k.photos || [])[k.round] };
+    const winners = entries.filter(e2 => e2.n === topN && topN > 0).map(e2 => room.players[e2.cpid]).filter(Boolean);
+    $('#ccSub').innerHTML = topN === 0 ? 'Nobody got a single vote. Brutal.'
+      : winners.length > 1 ? `Dead heat — ${winners.map(p2 => `<b style="color:var(--gold)">${esc(p2.name)}</b>`).join(' & ')} split the room!`
+      : winners.length ? `<b style="color:var(--gold)">${esc(winners[0].name)}</b> takes the round${sweep ? ' — unanimous!' : '!'}`
+      : 'Points on the board!';
+    await sleep(sweep ? 2800 : 2400);
+    await R().update(u);
+    ccAdvance(k.round);
+  }
+
+  function renderCcFinal() {
+    const k = room.contest;
+    const ranked = players().map(([pid, p]) => [pid, p, (k.scores || {})[pid] || 0]).sort((a, b) => b[2] - a[2]);
+    confettiBurst(140);
+    SFX.play('fanfare');
+    VOICE.say('vo_showcase');
+    const pods = ranked.map(([pid, p, sc], i) => `
+      <div class="sd-pod card${i === 0 ? ' first' : ''}" style="animation-delay:${i * .15}s">
+        ${i === 0 ? '<div class="crown">👑</div>' : ''}
+        ${pav(p.avatar)}<b>${esc(p.name)}</b><span class="pts">${sc} pt${sc === 1 ? '' : 's'}</span>
+      </div>`).join('');
+    const best = k.best;
+    const bestCard = best && room.players[best.pid] ? `
+      <div class="award-card card" style="margin-top:26px;animation-delay:.6s"><div class="award-emoji">🏆</div>
+        <div class="award-photo"><img src="${best.photo}" alt=""></div>
+        <h3>Caption of the Night</h3>
+        <p style="font-size:15px;color:var(--cream)">“${esc(best.text)}”</p>
+        <div class="award-name">${esc(room.players[best.pid].name)} · ${best.votes} vote${best.votes === 1 ? '' : 's'}</div></div>` : '';
+    stage().innerHTML = `
+      <div class="awards-scroll"><div class="awards-inner">
+        <div class="tv-caption">📸 Caption champion<span class="accent">!</span></div>
+        <div class="tv-sub" style="margin:0 0 20px"><b style="color:var(--gold);font-size:1.3em">${esc(ranked[0][1].name)}</b> captioned them all.</div>
+        <div class="sd-podium">${pods}</div>
+        ${bestCard}
+        <div class="tv-sub" style="margin-top:26px"><button class="btn ghost" id="ccAgainBtn">🔁 New game</button></div>
+      </div></div>`;
+    $('#ccAgainBtn').onclick = async () => { await db.ref('rooms/' + code).remove(); sessionStorage.removeItem('ht_tv'); location.reload(); };
+  }
+
   return { init };
 })();
 
@@ -2904,7 +3123,8 @@ const Player = (() => {
     const key = [room.state, room.round, room.phase, room.turnIdx, b.num, b.pick != null, !!myVote(),
       b.predictions && b.predictions[pid] != null,
       sd.duelIdx, d.rematch, !!(sd.kept && sd.kept[pid]), !!(d.cards && d.cards[pid]), d.votes && d.votes[pid] != null,
-      (room.caption || {}).round, (room.caption || {}).matchupIdx, !!(room.caption || {}).finale, capSelfKey()].join('|');
+      (room.caption || {}).round, (room.caption || {}).matchupIdx, !!(room.caption || {}).finale, capSelfKey(),
+      (room.contest || {}).round, ccSelfKey()].join('|');
     if (key === lastKey) return;
     lastKey = key;
     // caption-mode self status for the dedupe key
@@ -2920,6 +3140,14 @@ const Player = (() => {
         const m = (((c.rounds || [])[c.round]) || [])[c.matchupIdx] || {};
         return (m.votes || {})[pid] != null ? 1 : 0;
       }
+      return 0;
+    }
+    // contest-mode self status for the dedupe key
+    function ccSelfKey() {
+      const k = room.contest || {};
+      if (room.state === 'ccPick') return (k.picks || {})[pid] ? 1 : 0;
+      if (room.state === 'ccWrite') return (k.caps || {})[pid] ? 1 : 0;
+      if (room.state === 'ccVote') return (k.votes || {})[pid] != null ? 1 : 0;
       return 0;
     }
     const st = room.state;
@@ -2940,6 +3168,11 @@ const Player = (() => {
     else if (st === 'capVote') renderCapVote();
     else if (st === 'capReveal') stage().innerHTML = waitingCard('🥁', 'Verdict on the TV!', 'Watch who wrote what…');
     else if (st === 'capFinal') renderCapFinalPhone();
+    else if (st === 'ccPick') renderCcPick();
+    else if (st === 'ccWrite') renderCcWrite();
+    else if (st === 'ccVote') renderCcVote();
+    else if (st === 'ccReveal') stage().innerHTML = waitingCard('🥁', 'Results on the TV!', 'Watch who wrote what…');
+    else if (st === 'ccFinal') renderCcFinalPhone();
   }
 
   function renderAwardsWatch() {
@@ -3423,6 +3656,76 @@ const Player = (() => {
       <div class="status-card card">
       <h3>${champ ? 'Funniest person alive!' : 'Game over'}</h3>
       <p>You finished with <b style="color:var(--gold)">${myScore} point${myScore === 1 ? '' : 's'}</b>${champ ? ' — comedy champion!' : '.'}</p></div>`;
+  }
+
+  /* ---- Caption Contest ---- */
+  const CC_TOTAL = 10;
+  let ccPickSel = [], ccBallotKey = '', ccBallot = [];
+  function renderCcPick() {
+    const k = room.contest;
+    if ((k.picks || {})[pid]) { stage().innerHTML = waitingCard('🃏', 'Photos locked in!', 'Waiting for the others…'); return; }
+    const pool = (k.pools || {})[pid] || [], need = k.pickCount || 2;
+    ccPickSel = ccPickSel.filter(u => pool.includes(u));
+    stage().innerHTML = `
+      <div class="phone-title" style="color:var(--gold)">📸 Pick ${need} photo${need > 1 ? 's' : ''}</div>
+      <div class="phone-sub">The whole room captions YOUR picks — choose wisely</div>
+      <div class="draft-grid" id="ccGrid"></div>
+      <button class="btn big gold" id="ccGo" style="width:100%" disabled>Pick ${need} to continue</button>`;
+    const g = $('#ccGrid');
+    pool.forEach(url => {
+      const sel = ccPickSel.includes(url);
+      const full = ccPickSel.length >= need;
+      const card = el('div', 'draft-card' + (sel ? ' sel' : full ? ' dim' : ''), `<img src="${url}" alt="">`);
+      card.onclick = () => {
+        if (ccPickSel.includes(url)) ccPickSel = ccPickSel.filter(u => u !== url);
+        else if (ccPickSel.length < need) ccPickSel.push(url);
+        if (navigator.vibrate) navigator.vibrate(10);
+        renderCcPick();
+      };
+      g.appendChild(card);
+    });
+    const btn = $('#ccGo');
+    btn.disabled = ccPickSel.length < need;
+    if (ccPickSel.length >= need) btn.textContent = 'Lock them in ▶';
+    btn.onclick = () => { if (ccPickSel.length >= need) { btn.disabled = true; R().child('contest/picks/' + pid).set(ccPickSel); } };
+  }
+
+  function renderCcWrite() {
+    const k = room.contest;
+    if ((k.caps || {})[pid]) { stage().innerHTML = waitingCard('🤫', 'Caption in!', 'Waiting for the slow writers…'); return; }
+    captionForm((k.photos || [])[k.round], `Round ${k.round + 1} of ${CC_TOTAL} — caption this photo`, t => R().child('contest/caps/' + pid).set(t));
+  }
+
+  function renderCcVote() {
+    const k = room.contest;
+    if ((k.votes || {})[pid] != null) { stage().innerHTML = waitingCard('🗳️', 'Vote cast', 'Waiting for the rest…'); return; }
+    const bk = 'ccB:' + k.round + ':' + Object.keys(k.caps || {}).sort().join('|');
+    if (ccBallotKey !== bk) {
+      ccBallotKey = bk;
+      ccBallot = shuffle(Object.entries(k.caps || {}).filter(([cpid]) => cpid !== pid));   // stable shuffled ballot
+    }
+    if (!ccBallot.length) { stage().innerHTML = waitingCard('😴', 'Nothing to vote on', 'Watch the TV…'); return; }
+    stage().innerHTML = `
+      <div class="phone-title" style="color:var(--gold)">📸 Pick the funniest</div>
+      <div class="cap-mini"><img src="${(k.photos || [])[k.round]}" alt=""></div>
+      <div class="phone-sub">Not your own — nice try.</div>
+      <div style="margin-top:8px">${ccBallot.map(([cpid, t]) => `<button class="cap-pick" data-k="${esc(cpid)}">${esc(t)}</button>`).join('')}</div>`;
+    stage().querySelectorAll('.cap-pick').forEach(b2 => b2.onclick = () => {
+      if (((room.contest || {}).votes || {})[pid] != null) return;
+      b2.classList.add('chosen');
+      R().child('contest/votes/' + pid).set(b2.dataset.k);
+    });
+  }
+
+  function renderCcFinalPhone() {
+    const k = room.contest;
+    const myScore = (k.scores || {})[pid] || 0;
+    const ranked = Object.entries(k.scores || {}).sort((a, b) => b[1] - a[1]);
+    const champ = ranked[0] && ranked[0][0] === pid;
+    stage().innerHTML = `<div class="big-emoji">${champ ? '👑' : '📸'}</div>
+      <div class="status-card card">
+      <h3>${champ ? 'Caption champion!' : 'Game over'}</h3>
+      <p>You finished with <b style="color:var(--gold)">${myScore} point${myScore === 1 ? '' : 's'}</b>${champ ? ' — the room loves you!' : '.'}</p></div>`;
   }
 
   /* ---- shareable recap card (canvas → PNG) ---- */
