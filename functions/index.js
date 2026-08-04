@@ -97,24 +97,41 @@ exports.ssJudge = onCall({ region: 'us-central1', timeoutSeconds: 60 }, async (r
   };
   const p = d.profile || {};
   try {
-    const list = d.lines.map(l => `- pid "${l.pid}" (${l.name}): "${l.text}"`).join('\n');
-    const text = await claude(
-      `You are ${p.name}, ${p.age}, ${p.job} from ${p.location}. ` +
-      (p.prompts || []).map(pr => `On your dating profile, under "${pr.label}", you wrote: "${pr.answer}". `).join('') +
-      'A group of guys at a party each typed you one pickup line. ' +
-      'You are witty, flirty, savage but not cruel, strictly PG-13. Return ONLY JSON — no markdown.',
-      `${RULES[d.roundType] || RULES.standard}\n\nThe lines:\n${list}\n\n` +
-      'Return JSON with EXACTLY these keys:\n' +
+    const hist = Array.isArray(d.history) && d.history.length
+      ? 'Earlier tonight you judged: ' + d.history.map(h => `${h.winnerName} won over ${h.prof} with "${h.winnerText}"`).join('; ') + '. You may call back to these. '
+      : '';
+    // content blocks: every line WITH the guy's actual face attached
+    const blocks = [{ type: 'text', text:
+      `${RULES[d.roundType] || RULES.standard}\n\n` +
+      'Each pickup line is followed by a photo of the guy who said it. You may reference his appearance in your response, roast, or verdicts.\n\n' }];
+    d.lines.forEach(l => {
+      blocks.push({ type: 'text', text: `pid "${l.pid}" (${l.name}): "${l.text}"` });
+      const m2 = /^data:(image\/(?:jpeg|png|webp));base64,(.+)$/.exec(l.avatar || '');
+      if (m2) blocks.push({ type: 'image', source: { type: 'base64', media_type: m2[1], data: m2[2] } });
+    });
+    blocks.push({ type: 'text', text:
+      '\nReturn JSON with EXACTLY these keys:\n' +
       '"winnerPid": pid of the best line (copy the pid EXACTLY as given),\n' +
       '"response": your spoken reply to the winner — 1-3 sentences, in character, reference something SPECIFIC from their line, address them by first name,\n' +
       '"roastPid": pid of the worst line (different from the winner if possible),\n' +
-      '"roast": one savage sentence about why that line failed, address them by first name.',
-      500);
+      '"roast": one savage sentence about why that line failed, address them by first name,\n' +
+      '"verdicts": object mapping EVERY non-winner pid to a 1-3 word verdict stamp (e.g. "desperate", "smooth", "restraining order", "too safe"),\n' +
+      '"crowdDisagree": one savage sentence defending your pick if the whole room boos it — dismiss them all.' });
+    const text = await claude(
+      `You are ${p.name}, ${p.age}, ${p.job} from ${p.location}. ` +
+      (p.prompts || []).map(pr => `On your dating profile, under "${pr.label}", you wrote: "${pr.answer}". `).join('') +
+      hist +
+      'A group of guys at a party each typed you one pickup line. ' +
+      'You are witty, flirty, savage but not cruel, strictly PG-13. Return ONLY JSON — no markdown.',
+      blocks, 700);
     const j = firstJson(text, '{', '}');
-    let audioUrl = null, roastAudioUrl = null;
-    if (ELEVENLABS_KEY()) {
-      if (j.response) { try { audioUrl = await ttsToStorage(j.response); } catch (e) { console.error('tts failed (text-only fallback)', e); } }
-      if (j.roast) { try { roastAudioUrl = await ttsToStorage(j.roast); } catch (e) { console.error('roast tts failed', e); } }
+    let audioUrl = null, roastAudioUrl = null, disagreeAudioUrl = null;
+    if (ELEVENLABS_KEY()) {   // all three voices fire in PARALLEL
+      const jobs = [];
+      if (j.response) jobs.push(ttsToStorage(j.response).then(u => { audioUrl = u; }).catch(e => console.error('tts failed', e)));
+      if (j.roast) jobs.push(ttsToStorage(j.roast).then(u => { roastAudioUrl = u; }).catch(e => console.error('roast tts failed', e)));
+      if (j.crowdDisagree) jobs.push(ttsToStorage(j.crowdDisagree).then(u => { disagreeAudioUrl = u; }).catch(e => console.error('disagree tts failed', e)));
+      await Promise.all(jobs);
     }
     return {
       winnerPid: j.winnerPid,
@@ -122,8 +139,11 @@ exports.ssJudge = onCall({ region: 'us-central1', timeoutSeconds: 60 }, async (r
       response: j.response || null,
       roastPid: j.roastPid || null,
       roast: j.roast || null,
+      verdicts: j.verdicts || null,
+      crowdDisagree: j.crowdDisagree || null,
       audioUrl,
-      roastAudioUrl
+      roastAudioUrl,
+      disagreeAudioUrl
     };
   } catch (e) {
     console.error('ssJudge failed', e);
