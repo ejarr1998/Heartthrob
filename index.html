@@ -1181,13 +1181,27 @@ function route() {
   else if (h === '#join') {
     // a device that already joined should fall straight back into its room, not re-type the code
     const saved = (() => { try { return JSON.parse(localStorage.getItem('ht_player') || 'null'); } catch (e) { return null; } })();
-    if (saved && saved.code && saved.pid) Player.resume(saved); else show('joinView');
+    if (saved && saved.code && saved.pid) Player.resume(saved);
+    else { show('joinView'); prefillJoinCode(); }
   }
   else {
     const saved = JSON.parse(localStorage.getItem('ht_player') || 'null');
     if (saved && saved.code && saved.pid) { Player.resume(saved); } else show('landing');
   }
 }
+// dev convenience: auto-fill the most recent room code (lobby rooms preferred). Strip before shipping.
+async function prefillJoinCode() {
+  try {
+    const snap = await db.ref('rooms').once('value');
+    const rooms = snap.val() || {};
+    const codes = Object.keys(rooms).sort();
+    const open = codes.filter(c => rooms[c] && rooms[c].state === 'lobby');
+    const best = open.pop() || codes.pop();
+    const inp = $('#joinCode');
+    if (best && inp && !inp.value) inp.value = best;
+  } catch (e) { /* prefill is best-effort */ }
+}
+
 window.addEventListener('hashchange', route);
 $('#goJoin').onclick = () => location.hash = '#join';
 $('#goTv').onclick = () => location.hash = '#tv';
