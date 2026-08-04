@@ -574,11 +574,16 @@ input[type=text]::placeholder{color:#6E5CA8;font-weight:600}
 .cap-prompt.hero{color:var(--cream);font-size:clamp(30px,4.6vw,64px);line-height:1.12;max-width:min(1500px,94vw);
   margin-bottom:20px;text-shadow:0 4px 22px rgba(0,0,0,.55);text-wrap:balance}
 .cap-medals{font-size:13px;color:var(--muted);font-weight:800;margin-top:5px}
-.ss-profile{background:var(--ink2);border:2px solid var(--line);border-radius:20px;padding:18px 28px;max-width:min(760px,94vw);text-align:left}
+.ss-profile{background:var(--ink2);border:2px solid var(--line);border-radius:20px;padding:22px 30px;max-width:min(860px,94vw);text-align:left;flex:1;min-width:min(560px,60vw)}
 .ss-name{font-family:'Bungee';font-size:clamp(24px,3vw,42px);color:var(--cream)}
 .ss-tag{font-weight:800;font-size:clamp(14px,1.6vw,20px);color:var(--muted);margin-top:6px}
+.ss-photo{position:relative;overflow:hidden}
+.ss-photo-name{position:absolute;left:0;right:0;bottom:0;padding:40% 20px 14px;background:linear-gradient(transparent,rgba(8,5,16,.92));font-family:'Bungee';font-size:clamp(22px,2.6vw,44px);color:var(--cream);text-shadow:0 2px 12px rgba(0,0,0,.7);pointer-events:none;z-index:2}
+.ss-chips{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.ss-chip{background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:10px 14px;font-weight:700;font-size:clamp(13px,1.25vw,19px);line-height:1.3}
+.ss-chip.red{border-color:rgba(255,90,120,.45);color:#ffb3c2}
 .ss-tag b{color:var(--cream)}
-.ss-greet{margin-top:12px;font-weight:800;font-size:clamp(16px,1.9vw,26px);color:var(--rose)}
+.ss-greet{font-weight:800;font-size:clamp(22px,2.7vw,44px);line-height:1.16;color:var(--rose);margin-bottom:16px;text-wrap:balance}
 .ss-line{background:var(--ink2);border:3px solid var(--gold);border-radius:18px;padding:16px 22px;font-weight:800;font-size:clamp(20px,2.6vw,36px);color:var(--cream);text-align:left}
 .ss-who{display:flex;align-items:center;gap:10px;margin-top:10px;font-size:clamp(14px,1.6vw,20px);font-weight:800;color:var(--muted)}
 .ss-who .pav{width:34px;height:34px;border-width:2px}
@@ -3196,14 +3201,16 @@ const TV = (() => {
       <div class="tv-caption">😏 Round ${k.round + 1} of ${SS_ROUNDS} — shoot your shot<span class="accent">!</span></div>
       <div class="cap-timer" id="ccTimer"></div>
       <div class="cap-stage">
-        <div class="cap-photo">${mediaTag(prof.photo)}</div>
+        <div class="cap-photo ss-photo">${mediaTag(prof.photo)}
+          <div class="ss-photo-name">${esc(prof.name)}, ${prof.age}</div></div>
         <div class="ss-profile">
-          <div class="ss-name">${esc(prof.name)}, ${prof.age}</div>
-          <div class="ss-tag">💼 <b>${esc(prof.job)}</b></div>
-          <div class="ss-tag">✨ ${esc(prof.vibe)}</div>
-          <div class="ss-tag">💘 Looking for: <b>${esc(prof.looking_for)}</b></div>
-          <div class="ss-tag">🚩 Dealbreaker: <b>${esc(prof.dealbreaker)}</b></div>
           <div class="ss-greet">“${esc(prof.greeting)}”</div>
+          <div class="ss-chips">
+            <div class="ss-chip">💼 ${esc(prof.job)}</div>
+            <div class="ss-chip">✨ ${esc(prof.vibe)}</div>
+            <div class="ss-chip">💘 ${esc(prof.looking_for)}</div>
+            <div class="ss-chip red">🚩 ${esc(prof.dealbreaker)}</div>
+          </div>
         </div>
       </div>
       <div class="tv-sub" style="margin-top:14px">${rule}</div>
@@ -3256,7 +3263,7 @@ const TV = (() => {
     if (res.audioUrl) VOICE.sayUrl(res.audioUrl);   // her real voice (ElevenLabs mp3)
     else speakHer(res.response || '');              // demo mode: browser voice
     await sleep(2800);
-    if (res.roast) { $('#ssRoast').style.display = ''; SFX.play('thump'); }
+    if (res.roast) { $('#ssRoast').style.display = ''; SFX.play('thump'); if (res.roastAudioUrl) VOICE.sayUrl(res.roastAudioUrl); }
     $('#ssSub').innerHTML = winner
       ? `<b style="color:var(--gold)">${esc(room.players[winner].name)}</b> gets her number${finale ? ' — double points!' : '!'}`
       : 'She left. Nobody wins.';
@@ -4062,12 +4069,30 @@ const Player = (() => {
       <div class="cap-mini">${mediaTag(prof.photo)}</div>
       <div class="phone-sub" style="margin-bottom:4px">💼 ${esc(prof.job)} · 🚩 ${esc(prof.dealbreaker)}</div>
       <div class="phone-sub" style="margin-bottom:12px;color:var(--gold)">${rule}</div>
+      <div class="cap-timer" id="ssPTimer" style="font-size:34px;margin-bottom:8px"></div>
       <textarea class="cap-ta" id="ssTa" maxlength="80" placeholder="your pickup line… (80 chars)"></textarea>
       <button class="btn big" id="ssGo" style="width:100%;margin-top:12px" disabled>Send it ▶</button>`;
     const ta = $('#ssTa'), btn = $('#ssGo');
     ssDraft = '';
+    ssStartPhoneTimer();
     ta.oninput = () => { ssDraft = ta.value; btn.disabled = !ta.value.trim(); };
     btn.onclick = () => { const t = ta.value.trim(); if (t) { btn.disabled = true; ssDraft = ''; R().child('shoot/lines/' + pid).set(t); } };
+  }
+
+  // phone-side countdown (90s write clock, mirrors the TV)
+  let ssPTick = null;
+  function ssStartPhoneTimer() {
+    clearInterval(ssPTick);
+    const end = Date.now() + 90000;
+    const tick = () => {
+      const t = $('#ssPTimer');
+      if (!t) { clearInterval(ssPTick); return; }
+      const sLeft = Math.max(0, Math.ceil((end - Date.now()) / 1000));
+      t.textContent = sLeft + 's';
+      t.style.color = sLeft <= 10 ? 'var(--rose)' : 'var(--gold)';
+    };
+    tick();
+    ssPTick = setInterval(tick, 500);
   }
 
   // time-up safety net: whatever was typed counts

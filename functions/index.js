@@ -107,9 +107,10 @@ exports.ssJudge = onCall({ region: 'us-central1', timeoutSeconds: 60 }, async (r
       '"roast": one savage sentence about why that line failed, address them by first name.',
       500);
     const j = firstJson(text, '{', '}');
-    let audioUrl = null;
-    if (ELEVENLABS_KEY() && j.response) {
-      try { audioUrl = await ttsToStorage(j.response); } catch (e) { console.error('tts failed (text-only fallback)', e); }
+    let audioUrl = null, roastAudioUrl = null;
+    if (ELEVENLABS_KEY()) {
+      if (j.response) { try { audioUrl = await ttsToStorage(j.response); } catch (e) { console.error('tts failed (text-only fallback)', e); } }
+      if (j.roast) { try { roastAudioUrl = await ttsToStorage(j.roast); } catch (e) { console.error('roast tts failed', e); } }
     }
     return {
       winnerPid: j.winnerPid,
@@ -117,7 +118,8 @@ exports.ssJudge = onCall({ region: 'us-central1', timeoutSeconds: 60 }, async (r
       response: j.response || null,
       roastPid: j.roastPid || null,
       roast: j.roast || null,
-      audioUrl
+      audioUrl,
+      roastAudioUrl
     };
   } catch (e) {
     console.error('ssJudge failed', e);
