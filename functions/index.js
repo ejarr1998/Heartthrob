@@ -41,8 +41,8 @@ const firstJson = (text, open, close) => {
   return JSON.parse(text.slice(a, b + 1));
 };
 
-async function ttsToStorage(text) {
-  const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE()}?output_format=mp3_44100_128`, {
+async function ttsToStorage(text, voiceId) {
+  const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId || ELEVENLABS_VOICE()}?output_format=mp3_44100_128`, {
     method: 'POST',
     headers: { 'xi-api-key': ELEVENLABS_KEY(), 'content-type': 'application/json' },
     body: JSON.stringify({
@@ -147,6 +147,55 @@ exports.ssJudge = onCall({ region: 'us-central1', timeoutSeconds: 60 }, async (r
     };
   } catch (e) {
     console.error('ssJudge failed', e);
+    return { demo: true };
+  }
+});
+
+/* ---- Profile Review: a panel of three AI girls swipes on the guys' own profiles ---- */
+exports.prJudge = onCall({ region: 'us-central1', timeoutSeconds: 60 }, async (req) => {
+  const d = req.data || {};
+  if (!ANTHROPIC_KEY()) return { demo: true };
+  try {
+    const name = d.name || 'this guy';
+    const blocks = [{ type: 'text', text:
+      `You are reviewing ${name}'s dating profile. His photos are attached, then his written answers.\n` +
+      `Prompts: ${(d.prompts || []).map(pr => `"${pr.label}" -> "${pr.answer}"`).join('; ')}\n` +
+      (d.bio ? `Bio: "${d.bio}"\n` : '') }];
+    (d.photos || []).slice(0, 3).forEach(u => {
+      const m = /^data:(image\/(?:jpeg|png|webp));base64,(.+)$/.exec(u || '');
+      if (m) blocks.push({ type: 'image', source: { type: 'base64', media_type: m[1], data: m[2] } });
+    });
+    blocks.push({ type: 'text', text:
+      '\nReturn JSON with EXACTLY these keys: "romantic", "savage", "unhinged" — each an object ' +
+      '{"swipe": "left" or "right", "comment": your spoken verdict, 1-2 sentences}. ' +
+      'Each comment MUST reference something SPECIFIC you see in his photos or answers. Address him by first name sometimes.' });
+    const text = await claude(
+      'You are THREE women on a party dating-profile review panel, judging one guy out loud while he squirms. ' +
+      'ROMANTIC: hopeless romantic, generous, wants love to win — swipes right unless truly hopeless. ' +
+      'SAVAGE: brutally honest, impossible standards, hilarious — swipes left most of the time. ' +
+      'UNHINGED: chaotic, weird logic, unpredictable — swipes on vibes nobody can follow. ' +
+      'Strictly PG-13. Return ONLY JSON — no markdown.',
+      blocks, 800);
+    const j = firstJson(text, '{', '}');
+    const VOICES = {
+      romantic: process.env.ELEVENLABS_VOICE_ROMANTIC || 'EXAVITQu4vr4xnSDxMaL',   // Sarah
+      savage: process.env.ELEVENLABS_VOICE_SAVAGE || 'cgSgspJ2msm6clMCkdW9',        // Jessica
+      unhinged: process.env.ELEVENLABS_VOICE_UNHINGED || 'pFZP5JQG7iQjIQuC4Bku'     // Lily
+    };
+    const out = {}, jobs = [];
+    for (const persona of ['romantic', 'savage', 'unhinged']) {
+      const v = j[persona] || {};
+      out[persona] = { swipe: v.swipe === 'left' ? 'left' : 'right', comment: v.comment || '', audioUrl: null };
+      if (ELEVENLABS_KEY() && out[persona].comment) {
+        jobs.push(ttsToStorage(out[persona].comment, VOICES[persona])
+          .then(u => { out[persona].audioUrl = u; })
+          .catch(e => console.error(persona + ' tts failed', e)));
+      }
+    }
+    await Promise.all(jobs);   // all three voices in parallel
+    return { verdicts: out };
+  } catch (e) {
+    console.error('prJudge failed', e);
     return { demo: true };
   }
 });

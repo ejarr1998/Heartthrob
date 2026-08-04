@@ -588,6 +588,18 @@ input[type=text]::placeholder{color:#6E5CA8;font-weight:600}
 @keyframes ssTossL{25%{transform:translate(0,-16px) rotate(-4deg)}to{transform:translate(-72vw,-26vh) rotate(-28deg);opacity:0}}
 .ss-win{border-color:var(--gold)!important;box-shadow:0 0 28px rgba(255,200,60,.4);transform:scale(1.1);background:rgba(255,200,60,.08)!important}
 .ss-pin{display:flex;flex-direction:column;align-items:center;gap:16px;animation:slideUp .45s both}
+.pr-photos{display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:6px}
+.pr-photo{border-radius:12px;overflow:hidden;aspect-ratio:3/4}
+.pr-photo img,.pr-photo video{width:100%;height:100%;object-fit:cover;display:block}
+.pr-verdict{background:var(--ink2);border:2px solid var(--line);border-radius:18px;padding:14px 20px;text-align:left;position:relative}
+.pr-persona{font-weight:800;font-size:clamp(15px,1.5vw,22px);margin-bottom:6px}
+.pr-comment{font-size:clamp(15px,1.5vw,22px);line-height:1.3;font-weight:600}
+.pr-stamp{position:absolute;top:8px;right:14px;font-family:'Bungee';font-size:clamp(15px,1.7vw,26px);transform:rotate(8deg);animation:stamp .3s both}
+.pr-stamp.right{color:#57D98F}
+.pr-stamp.left{color:#FF5A78}
+.pr-thumb{width:70px;height:70px;border-radius:10px;overflow:hidden;position:relative;border:2px solid var(--line)}
+.pr-thumb img{width:100%;height:100%;object-fit:cover}
+.pr-thumb span{position:absolute;top:1px;right:5px;color:#fff;text-shadow:0 1px 4px #000;font-weight:800;cursor:pointer}
 .ss-card{width:min(500px,88vw);background:var(--ink2);border:2px solid var(--line);border-radius:26px;overflow:hidden;text-align:left;box-shadow:0 24px 60px rgba(0,0,0,.5);animation:cardIn .55s both}
 .ss-card-photo{position:relative;width:100%;height:min(44vh,440px);overflow:hidden}
 .ss-card-photo img,.ss-card-photo video{width:100%;height:100%;object-fit:cover;display:block}
@@ -1637,6 +1649,9 @@ const Studio = (() => {
 /* ================================================================
    TV — game master, drives all state transitions
 ================================================================ */
+// shared: Hinge prompt labels for Profile Review (TV + phone both use these)
+const PR_PROMPTS = ['My simple pleasures', 'I want someone who', 'Together, we could', "I'm known for", "Don't hate me if I", 'The way to win me over', 'Green flags I look for'];
+
 const TV = (() => {
   let code = null, room = null, booted = false;
   const done = new Set();                     // one-shot guards
@@ -1789,6 +1804,9 @@ const TV = (() => {
       const k = room.shoot;
       const missing = players().filter(([pid]) => !(k.lines || {})[pid]);
       armIdle('ssW:' + k.round, missing.length > 0, missing.length === 1 ? missing[0][0] : null, 52000);   // profile reveal eats ~9s before the clock starts
+    } else if (st === 'prBuild') {
+      const k2 = room.review || {}, missing = players().filter(([pid]) => !((k2.profiles || {})[pid]));
+      armIdle('prBuild', missing.length > 0, missing.length === 1 ? missing[0][0] : null, 52000);
     } else armIdle('none', false);
     // sudden-death heartbeat: only while a rematch duel is being picked
     const wantHB = st === 'sdDuel' && room.showdown && room.showdown.duel && room.showdown.duel.rematch;
@@ -1816,6 +1834,9 @@ const TV = (() => {
     else if (st === 'ccVote') renderCcVoteTV();
     else if (st === 'ccReveal') { if (once('ccReveal:' + room.contest.round)) playCcReveal(); }
     else if (st === 'ccFinal') { if (once('ccFinal')) renderCcFinal(); }
+    else if (st === 'prBuild') renderPrBuildTV();
+    else if (st === 'prReview') { if (once('prReview:' + room.review.idx)) playPrReview(); }
+    else if (st === 'prFinal') { if (once('prFinal')) renderPrFinal(); }
     else if (st === 'ssIntro') renderSsIntroTV();
     else if (st === 'ssWrite') renderSsWriteTV();
     else if (st === 'ssJudge') { if (once('ssJudge:' + room.shoot.round)) playSsJudge(); }
@@ -1849,6 +1870,7 @@ const TV = (() => {
         <button class="btn big" id="capBtn" ${ps.length < 2 ? 'disabled' : ''}>😂 She's a 10 but… ▶</button>
         <button class="btn big gold" id="ccBtn" ${ps.length < 3 ? 'disabled' : ''}>📸 Caption Contest ▶</button>
         <button class="btn big" id="ssBtn" ${ps.length < 2 ? 'disabled' : ''}>😏 Shoot Your Shot ▶</button>
+        <button class="btn big" id="prBtn" ${ps.length < 2 ? 'disabled' : ''}>😈 Profile Review ▶</button>
       </div>
       <div class="tv-sub">${ps.length < 2 ? 'Need at least 2 players' : ps.length > 6 ? 'Max 6 players!' : ps.length + ' player' + (ps.length > 1 ? 's' : '') + ' ready' + (ps.length < 3 ? ' · Showdown & Contest need 3+' : '')}</div>`;
     if (window.QRCode) new QRCode($('#lobbyQR'), { text: location.origin + location.pathname, width: 150, height: 150, correctLevel: QRCode.CorrectLevel.M });
@@ -1879,6 +1901,9 @@ const TV = (() => {
     const ssb = s.querySelector('#ssBtn');
     if (ps.length > 6) ssb.disabled = true;
     ssb.onclick = () => { ssb.disabled = true; startShoot(); };
+    const prb = s.querySelector('#prBtn');
+    if (ps.length > 6) prb.disabled = true;
+    prb.onclick = () => { prb.disabled = true; startReview(); };
   }
 
   /* ---------- arrow-through-heart start FX ---------- */
@@ -3485,6 +3510,140 @@ function renderSsWriteTV() {
     nextBtn.onclick = () => { nextBtn.disabled = true; SFX.play('whoosh'); ssAdvance(k.round); };
   }
 
+  /* ================= PROFILE REVIEW (mode: review) ================= */
+  const PR_BUILD_MS = 90000;
+  const PR_PERSONAS = [['romantic', '💗', 'The Romantic'], ['savage', '🔪', 'The Savage'], ['unhinged', '🤪', 'The Unhinged One']];
+
+  const prScoreStrip = () => {
+    const k = room.review, ps = players();
+    const max = Math.max(...ps.map(([pid]) => (k.scores || {})[pid] || 0));
+    return `<div class="score-strip">` + ps.map(([pid, p]) => {
+      const sc = (k.scores || {})[pid] || 0;
+      return `<div class="score-chip${sc === max && max > 0 ? ' lead' : ''}">${pav(p.avatar)}${esc(p.name)} · ${sc}</div>`;
+    }).join('') + `</div>`;
+  };
+
+  function prMockVerdicts(name) {
+    return {
+      romantic: { swipe: Math.random() < .7 ? 'right' : 'left', comment: `${name}, I genuinely see something sweet here. I would give him a chance.`, audioUrl: null },
+      savage: { swipe: Math.random() < .7 ? 'left' : 'right', comment: `${name}. Buddy. We need to talk about literally everything on this profile.`, audioUrl: null },
+      unhinged: { swipe: Math.random() < .5 ? 'right' : 'left', comment: `His energy says golden retriever but his photos say witness protection. I am IN.`, audioUrl: null }
+    };
+  }
+
+  async function startReview() {
+    const ps = players(), ids = ps.map(([pid]) => pid);
+    playStartFx(Math.random() < .5 ? 'vo_start_1' : 'vo_start_2');
+    const scores = {}; ids.forEach(pid => scores[pid] = 0);
+    R().update({ state: 'prBuild', mode: 'review',
+      review: { profiles: null, verdicts: null, order: null, idx: 0, scores } });
+  }
+
+  function renderPrBuildTV() {
+    const k = room.review, ps = players(), profs = k.profiles || {};
+    if (once('snd:prB')) {
+      SFX.play('whoosh');
+      VOICE.say(VOICE.pickFresh(['vo_round_1', 'vo_round_2', 'vo_round_3']));
+      armCcTimer(PR_BUILD_MS, 'prBuild', () => once('prBTO') && prBuildDone());
+    }
+    stage().innerHTML = `
+      ${prScoreStrip()}
+      <div class="tv-caption">😈 Build your dating profile<span class="accent">!</span></div>
+      <div class="cap-timer" id="ccTimer"></div>
+      <div class="tv-sub" style="max-width:min(940px,84vw);font-size:clamp(16px,1.8vw,26px)">On your phone: <b>2-3 photos</b>, <b>2 prompt answers</b>, optional bio.<br>The panel is watching. 💗 🔪 🤪</div>
+      <div class="waiting-avatars" style="margin-top:18px">${ps.map(([pid, p]) => `<div class="wa${profs[pid] ? ' done' : ''}"><img src="${p.avatar}" alt=""></div>`).join('')}</div>`;
+    if (ps.every(([pid]) => profs[pid]) && once('prAllIn')) { clearCcTimer(); VOICE.say('vo_votes_locked', { throttle: .4 }); prBuildDone(); }
+  }
+
+  function prBuildDone() {
+    const profs = (room.review || {}).profiles || {};
+    const order = shuffle(Object.keys(profs));
+    if (!order.length) { toast('Nobody built a profile!'); R().update({ state: 'lobby' }); return; }
+    R().update({ 'review/order': order, 'review/idx': 0, state: 'prReview' });
+  }
+
+  function prNext() {
+    const k = room.review;
+    R().update(k.idx + 1 < k.order.length ? { 'review/idx': k.idx + 1 } : { state: 'prFinal' });
+  }
+
+  async function playPrReview() {
+    const k = room.review, idx = k.idx, pid = k.order[idx], pl = room.players[pid] || {};
+    const prof = (k.profiles || {})[pid];
+    if (!prof) { prNext(); return; }
+    let verdict = (k.verdicts || {})[pid];
+    if (!verdict) {
+      stage().innerHTML = `${prScoreStrip()}
+        <div class="tv-caption">😈 The panel is deliberating<span class="accent">…</span></div>
+        <div class="tv-sub">💗 🔪 🤪 examining ${esc(pl.name || 'this guy')}'s profile<span class="dots"></span></div>`;
+      const out = await aiCall('prJudge', { name: pl.name || 'this guy', photos: prof.photos || [], prompts: prof.prompts || [], bio: prof.bio || '' }, 30000);
+      const v2 = out && out.verdicts ? out.verdicts : prMockVerdicts(pl.name || 'this guy');
+      await R().update({ ['review/verdicts/' + pid]: v2 });
+      verdict = v2;
+    }
+    stage().innerHTML = `
+      ${prScoreStrip()}
+      <div class="tv-caption">😈 Profile ${idx + 1} of ${k.order.length} — <span class="accent">${esc(pl.name || '???')}</span></div>
+      <div class="cap-stage" style="align-items:flex-start">
+        <div class="ss-card" style="width:min(470px,44vw)">
+          <div class="pr-photos">${(prof.photos || []).map(u => `<div class="pr-photo">${mediaTag(u)}</div>`).join('')}</div>
+          <div class="ss-card-body" style="gap:10px">
+            ${(prof.prompts || []).map(pr => `<div class="ss-prompt" style="padding:10px 14px"><div class="ss-prompt-lbl">${esc(pr.label)}</div><div class="ss-prompt-ans" style="font-size:clamp(14px,1.4vw,20px)">“${esc(pr.answer)}”</div></div>`).join('')}
+            ${prof.bio ? `<div class="tv-sub" style="font-style:italic">“${esc(prof.bio)}”</div>` : ''}
+          </div>
+        </div>
+        <div id="prPanel" style="flex:1;min-width:min(560px,48vw);display:flex;flex-direction:column;gap:14px"></div>
+      </div>
+      <div class="tv-sub" id="prSub"></div>`;
+    await sleep(2000);   // let the room inspect him first
+    let rights = 0;
+    for (const [persona, emoji, label] of PR_PERSONAS) {
+      if (room.state !== 'prReview') return;
+      const v = verdict[persona] || { swipe: 'right', comment: '' };
+      const panel = el('div', 'pr-verdict',
+        `<div class="pr-persona">${emoji} <b>${label}</b></div><div class="pr-comment">“${esc(v.comment)}”</div><div class="pr-stamp" style="display:none"></div>`);
+      panel.style.animation = 'slideUp .5s both';
+      $('#prPanel').appendChild(panel);
+      if (v.audioUrl) VOICE.sayUrl(v.audioUrl); else speakHer(v.comment || '');
+      await sleep(Math.min(8500, 2800 + (v.comment || '').length * 70));
+      const right = v.swipe === 'right';
+      if (right) rights++;
+      const stamp = panel.querySelector('.pr-stamp');
+      stamp.textContent = right ? '➡️ RIGHT' : '⬅️ LEFT';
+      stamp.className = 'pr-stamp ' + (right ? 'right' : 'left');
+      stamp.style.display = '';
+      SFX.play(right ? 'gold' : 'thump');
+      await sleep(1000);
+    }
+    const pts = rights * 100;
+    $('#prSub').innerHTML = `<b style="color:var(--gold)">${esc(pl.name || '???')}</b> gets ${rights} right swipe${rights === 1 ? '' : 's'} — +${pts}`;
+    const u = {}; u[`review/scores/${pid}`] = ((k.scores || {})[pid] || 0) + pts;
+    await R().update(u);
+    const last = idx + 1 >= k.order.length;
+    const nextBtn = el('button', 'btn big gold', last ? 'Final results ▶' : 'Next profile ▶');
+    nextBtn.style.cssText = 'margin-top:18px;font-size:clamp(18px,1.8vw,26px)';
+    stage().appendChild(nextBtn);
+    nextBtn.onclick = () => { nextBtn.disabled = true; SFX.play('whoosh'); prNext(); };
+  }
+
+  function renderPrFinal() {
+    const k = room.review;
+    const ranked = players().map(([pid, p]) => [pid, p, (k.scores || {})[pid] || 0]).sort((a, b) => b[2] - a[2]);
+    confettiBurst(140);
+    SFX.play('fanfare');
+    VOICE.say('vo_showcase');
+    const pods = ranked.map(([pid, p, sc], i) => `
+      <div class="sd-pod card${i === 0 ? ' first' : ''}" style="animation-delay:${i * .15}s">
+        ${i === 0 ? '<div class="crown">👑</div>' : ''}
+        ${pav(p.avatar)}<b>${esc(p.name)}</b><span class="pts">${sc} pt${sc === 1 ? '' : 's'}</span>
+      </div>`).join('');
+    stage().innerHTML = `
+      <div class="tv-caption">😈 Most Dateable<span class="accent">!</span></div>
+      <div class="sd-podium">${pods}</div>
+      <div class="tv-sub" style="margin-top:26px"><button class="btn ghost" id="prAgainBtn">🔁 New game</button></div>`;
+    $('#prAgainBtn').onclick = async () => { await db.ref('rooms/' + code).remove(); sessionStorage.removeItem('ht_tv'); location.reload(); };
+  }
+
   function renderSsFinal() {
     const k = room.shoot;
     const ranked = players().map(([pid, p]) => [pid, p, (k.scores || {})[pid] || 0]).sort((a, b) => b[2] - a[2]);
@@ -3614,9 +3773,15 @@ const Player = (() => {
       b.predictions && b.predictions[pid] != null,
       sd.duelIdx, d.rematch, !!(sd.kept && sd.kept[pid]), !!(d.cards && d.cards[pid]), d.votes && d.votes[pid] != null,
       (room.caption || {}).round, (room.caption || {}).matchupIdx, !!(room.caption || {}).finale, capSelfKey(),
-      (room.contest || {}).round, ccSelfKey(), (room.shoot || {}).round, ssSelfKey()].join('|');
+      (room.contest || {}).round, ccSelfKey(), (room.shoot || {}).round, ssSelfKey(),
+      (room.review || {}).idx, prSelfKey()].join('|');
     if (key === lastKey) return;
     lastKey = key;
+    function prSelfKey() {
+      const k = room.review || {};
+      if (room.state === 'prBuild') return (k.profiles || {})[pid] ? 1 : 0;
+      return '';
+    }
     // caption-mode self status for the dedupe key
     function capSelfKey() {
       const c = room.caption || {};
@@ -3669,6 +3834,9 @@ const Player = (() => {
     else if (st === 'ccVote') renderCcVote();
     else if (st === 'ccReveal') stage().innerHTML = waitingCard('🥁', 'Results on the TV!', 'Watch who wrote what…');
     else if (st === 'ccFinal') renderCcFinalPhone();
+    else if (st === 'prBuild') renderPrBuild();
+    else if (st === 'prReview') stage().innerHTML = waitingCard('😈', 'The panel is judging…', 'Sweat. They are merciless.');
+    else if (st === 'prFinal') renderPrFinalPhone();
     else if (st === 'ssIntro') stage().innerHTML = waitingCard('😏', 'Shoot Your Shot is loading…', 'The AI is writing the profiles. Get your game face on.');
     else if (st === 'ssWrite') renderSsWrite();
     else if (st === 'ssJudge') { ssFlushDraft(); stage().innerHTML = waitingCard('💭', "She's reading every line…", 'Sweat it out.'); }
@@ -4335,6 +4503,71 @@ function renderSsWrite() {
     const t = ssDraft.trim(), k = room.shoot || {};
     if (t && !(k.lines || {})[pid]) R().child('shoot/lines/' + pid).set(t);
     ssDraft = '';
+  }
+
+  /* ---- Profile Review (phone) ---- */
+  function renderPrBuild() {
+    const k = room.review || {};
+    if ((k.profiles || {})[pid]) { stage().innerHTML = waitingCard('😈', 'Profile submitted!', 'The panel is sharpening their knives…'); return; }
+    let photos = [];
+    stage().innerHTML = `
+      <div class="phone-title" style="color:var(--rose)">😈 Build your profile</div>
+      <div class="phone-sub" style="margin-bottom:6px">The panel will see EVERYTHING.</div>
+      <div class="cap-timer" id="ssPTimer" style="font-size:30px;margin-bottom:6px"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center" id="prThumbs"></div>
+      <button class="btn small teal" id="prAddPhoto" style="margin-top:8px">📁 Add photos (2-3)</button>
+      <input type="file" id="prPhotoInput" accept="image/*" multiple hidden>
+      <div id="prPrompts" style="width:100%;margin-top:12px"></div>
+      <input type="text" class="cap-ta" id="prBio" maxlength="60" placeholder="bio (optional)" style="min-height:0;height:auto;padding:12px;margin-top:10px">
+      <button class="btn big" id="prSubmit" style="width:100%;margin-top:14px" disabled>Submit to the panel ▶</button>`;
+    ssStartPhoneTimer();
+    const answers = [{ label: PR_PROMPTS[0], answer: '' }, { label: PR_PROMPTS[1], answer: '' }];
+    const pbox = $('#prPrompts');
+    answers.forEach((a, i) => {
+      const wrap = el('div', '', `<select class="cap-ta" id="prL${i}" style="min-height:0;height:auto;padding:10px;margin-bottom:6px;width:100%">${PR_PROMPTS.map(x => `<option${x === a.label ? ' selected' : ''}>${x}</option>`).join('')}</select><input type="text" class="cap-ta" id="prA${i}" maxlength="50" placeholder="your answer…" style="min-height:0;height:auto;padding:12px;width:100%">`);
+      wrap.style.marginBottom = '10px';
+      pbox.appendChild(wrap);
+      wrap.querySelector('#prL' + i).onchange = e2 => { a.label = e2.target.value; };
+      wrap.querySelector('#prA' + i).oninput = e2 => { a.answer = e2.target.value; check(); };
+    });
+    const draw = () => {
+      $('#prThumbs').innerHTML = photos.map((u, i) => `<div class="pr-thumb" data-i="${i}"><img src="${u}" alt=""><span>✕</span></div>`).join('');
+      $('#prThumbs').querySelectorAll('.pr-thumb').forEach(t => t.onclick = () => { photos.splice(+t.dataset.i, 1); draw(); check(); });
+      $('#prAddPhoto').style.display = photos.length >= 3 ? 'none' : '';
+    };
+    const check = () => { $('#prSubmit').disabled = !(photos.length >= 1 && answers.some(a => a.answer.trim())); };
+    $('#prAddPhoto').onclick = () => $('#prPhotoInput').click();
+    $('#prPhotoInput').onchange = async e2 => {
+      for (const fl of Array.from(e2.target.files).slice(0, 3 - photos.length)) {
+        const { img, url } = await fileToImage(fl);
+        photos.push(fitDataURL(img, 1080, .82));
+        URL.revokeObjectURL(url);
+      }
+      e2.target.value = '';
+      draw(); check();
+    };
+    $('#prSubmit').onclick = () => {
+      const payload = {
+        photos: photos.slice(0, 3),
+        prompts: answers.filter(a => a.answer.trim()).map(a => ({ label: a.label, answer: a.answer.trim() })),
+        bio: $('#prBio').value.trim()
+      };
+      if (!payload.photos.length || !payload.prompts.length) return;
+      $('#prSubmit').disabled = true;
+      R().child('review/profiles/' + pid).set(payload);
+    };
+    draw(); check();
+  }
+
+  function renderPrFinalPhone() {
+    const k = room.review || {};
+    const myScore = (k.scores || {})[pid] || 0;
+    const ranked = Object.entries(k.scores || {}).sort((a, b) => b[1] - a[1]);
+    const champ = ranked[0] && ranked[0][0] === pid;
+    stage().innerHTML = `<div class="big-emoji">${champ ? '👑' : '😈'}</div>
+      <div class="status-card card">
+      <h3>${champ ? 'Most Dateable!' : 'Game over'}</h3>
+      <p>You finished with <b style="color:var(--gold)">${myScore} point${myScore === 1 ? '' : 's'}</b>${champ ? ' — the panel has spoken!' : '.'}</p></div>`;
   }
 
   function renderSsFinalPhone() {
