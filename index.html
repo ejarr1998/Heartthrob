@@ -581,6 +581,12 @@ input[type=text]::placeholder{color:#6E5CA8;font-weight:600}
 .ss-oth{background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:14px;padding:10px 16px;max-width:min(440px,44vw);font-size:clamp(13px,1.2vw,18px);font-weight:600;text-align:left;transition:border-color .4s,box-shadow .4s}
 .ss-oth .who{color:var(--muted);font-size:.85em;margin-top:4px;display:flex;align-items:center;gap:6px}
 .ss-oth.roasted{border-color:rgba(255,90,120,.55);box-shadow:0 0 18px rgba(255,90,120,.18)}
+.ss-toss{animation:ssToss .62s ease-in both}
+@keyframes ssToss{25%{transform:translate(0,-16px) rotate(4deg)}to{transform:translate(72vw,-26vh) rotate(28deg);opacity:0}}
+.ss-field .ss-oth:nth-child(even).ss-toss{animation-name:ssTossL}
+@keyframes ssTossL{25%{transform:translate(0,-16px) rotate(-4deg)}to{transform:translate(-72vw,-26vh) rotate(-28deg);opacity:0}}
+.ss-win{border-color:var(--gold)!important;box-shadow:0 0 28px rgba(255,200,60,.4);transform:scale(1.1);background:rgba(255,200,60,.08)!important}
+.ss-pin{display:flex;flex-direction:column;align-items:center;gap:16px;animation:slideUp .45s both}
 .ss-photo{position:relative;overflow:hidden}
 .ss-photo-name{position:absolute;left:0;right:0;bottom:0;padding:40% 20px 14px;background:linear-gradient(transparent,rgba(8,5,16,.92));font-family:'Bungee';font-size:clamp(22px,2.6vw,44px);color:var(--cream);text-shadow:0 2px 12px rgba(0,0,0,.7);pointer-events:none;z-index:2}
 .ss-chips{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -3229,9 +3235,18 @@ const TV = (() => {
     const k = room.shoot, prof = k.profiles[k.round], lines = k.lines || {};
     stage().innerHTML = `
       ${ssScoreStrip()}
-      <div class="tv-caption">😏 She's reading every line<span class="accent">…</span></div>
-      <div class="cap-mini" style="width:min(34vh,320px)">${mediaTag(prof.photo)}</div>
-      <div class="tv-sub">${esc(prof.name)} is judging you. All of you.<span class="dots"></span></div>`;
+      <div class="tv-caption">😏 The shots are in<span class="accent">!</span></div>
+      <div class="cap-mini" style="width:min(26vh,240px)">${mediaTag(prof.photo)}</div>
+      <div class="ss-field" id="ssJudgeField"></div>
+      <div class="tv-sub">${esc(prof.name)} is reading every line<span class="dots"></span></div>`;
+    for (const [pid2, text] of Object.entries(lines)) {   // parade them while the AI thinks
+      const pl = room.players[pid2] || {};
+      const card = el('div', 'ss-oth', `“${esc(text)}”<div class="who">${pav(pl.avatar || '')}<span>${esc(pl.name || '???')}</span></div>`);
+      card.style.animation = 'popIn .3s both';
+      $('#ssJudgeField').appendChild(card);
+      SFX.play('whoosh');
+      await sleep(500);
+    }
     const payload = {
       profile: { name: prof.name, age: prof.age, job: prof.job, vibe: prof.vibe, looking_for: prof.looking_for, dealbreaker: prof.dealbreaker },
       roundType: k.roundTypes[k.round],
@@ -3251,33 +3266,51 @@ const TV = (() => {
     const k = room.shoot, prof = k.profiles[k.round], res = k.result || {};
     const finale = k.roundTypes[k.round] === 'finale';
     const winner = res.winnerPid && room.players[res.winnerPid] ? res.winnerPid : null;
-    const others = Object.entries(k.lines || {}).filter(([pid2]) => pid2 !== winner);
+    const entries = Object.entries(k.lines || {});
     stage().innerHTML = `
       ${ssScoreStrip()}
       <div class="tv-caption">😏 ${esc(prof.name)} has chosen<span class="accent">!</span></div>
-      <div class="cap-stage" style="align-items:flex-start">
-        <div class="cap-photo">${mediaTag(prof.photo)}</div>
-        <div class="cap-opts" style="gap:14px;align-items:stretch;flex:none;max-width:min(900px,58vw)">
-          <div class="ss-line">“${esc(res.winnerText || '')}”
-            <div class="ss-who">${winner ? pav(room.players[winner].avatar) + `<span>${esc(room.players[winner].name)} · +${finale ? 200 : 100}</span>` : ''}</div></div>
-          <div class="ss-resp">💬 “${esc(res.response || '')}”</div>
-          <div class="ss-roast" id="ssRoast" style="display:none">${res.roast ? '🧊 ' + esc(res.roast) : ''}</div>
-        </div>
+      <div id="ssMain" style="display:flex;flex-direction:column;align-items:center;gap:14px;width:100%">
+        <div class="cap-mini" style="width:min(22vh,210px)">${mediaTag(prof.photo)}</div>
+        <div class="ss-field" id="ssField">${entries.map(([pid2, text]) => {
+          const pl = room.players[pid2] || {};
+          return `<div class="ss-oth" id="ssOth_${pid2}">“${esc(text)}”<div class="who">${pav(pl.avatar || '')}<span>${esc(pl.name || '???')}</span></div></div>`;
+        }).join('')}</div>
+        <div class="ss-resp" id="ssResp" style="display:none;max-width:min(940px,84vw)"></div>
       </div>
-      ${others.length ? `<div class="ss-field">${others.map(([pid2, text]) => {
-        const pl = room.players[pid2] || {};
-        const roasted = res.roastPid && pid2 === res.roastPid;
-        return `<div class="ss-oth" id="ssOth_${pid2}">“${esc(text)}”<div class="who">${pav(pl.avatar || '')}<span>${esc(pl.name || '???')}${roasted ? ' · 💀' : ''}</span></div></div>`;
-      }).join('')}</div>` : ''}
+      <div id="ssRoastZone" style="display:none"></div>
       <div class="tv-sub" id="ssSub"></div>`;
+    await sleep(1600);                       // let the room re-read every line
+    for (const [pid2] of entries) {          // brush the losers aside, one at a time
+      if (pid2 === winner) continue;
+      const c = $('#ssOth_' + pid2);
+      if (c) c.classList.add('ss-toss');
+      SFX.play('whoosh');
+      await sleep(320);
+    }
+    const wc = winner && $('#ssOth_' + winner);   // winner stays, glows gold
+    if (wc) {
+      wc.classList.add('ss-win'); SFX.play('gold');
+      const who = wc.querySelector('.who span'); if (who) who.textContent += ` · +${finale ? 200 : 100}`;
+    }
+    await sleep(750);
+    const resp = $('#ssResp');               // her voiced answer beneath the winner
+    resp.textContent = '';
+    resp.innerHTML = `💬 “${esc(res.response || '')}”`;
+    resp.style.display = '';
     if (res.audioUrl) VOICE.sayUrl(res.audioUrl);   // her real voice (ElevenLabs mp3)
     else speakHer(res.response || '');              // demo mode: browser voice
-    await sleep(2800);
-    if (res.roast) {
-      $('#ssRoast').style.display = ''; SFX.play('thump');
-      const rc = res.roastPid && $('#ssOth_' + res.roastPid); if (rc) rc.classList.add('roasted');
-      if (res.roastAudioUrl) VOICE.sayUrl(res.roastAudioUrl);
-    }
+    await sleep(Math.min(9500, 3000 + (res.response || '').length * 70));   // let her finish
+    $('#ssMain').style.display = 'none';     // winner clears, roasted line gets pinned up
+    const rpl = res.roastPid && room.players[res.roastPid] ? room.players[res.roastPid] : null;
+    const rtext = res.roastPid && (k.lines || {})[res.roastPid];
+    const rz = $('#ssRoastZone');
+    rz.style.display = '';
+    if (res.roast) rz.innerHTML = `<div class="ss-pin">
+        ${rtext ? `<div class="ss-oth roasted" style="max-width:min(720px,72vw)">“${esc(rtext)}”<div class="who">${rpl ? pav(rpl.avatar) : ''}<span>${rpl ? esc(rpl.name) : '???'} · 💀</span></div></div>` : ''}
+        <div class="ss-roast" style="display:block">🧊 ${esc(res.roast)}</div>
+      </div>`;
+    if (res.roast) { SFX.play('thump'); if (res.roastAudioUrl) VOICE.sayUrl(res.roastAudioUrl); }
     $('#ssSub').innerHTML = winner
       ? `<b style="color:var(--gold)">${esc(room.players[winner].name)}</b> gets her number${finale ? ' — double points!' : '!'}`
       : 'She left. Nobody wins.';
