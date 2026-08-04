@@ -68,6 +68,7 @@ exports.ssProfiles = onCall({ region: 'us-central1', timeoutSeconds: 40 }, async
       'You write dating profiles for a college party game played by 4-6 guys in their 20s. ' +
       'Profiles are flirty, witty, savage but not cruel, strictly PG-13. Vary the archetypes ' +
       '(gym girl, nurse, lawyer, party girl, teacher, influencer, barista, film snob…). ' +
+      'Vary the jobs and education WIDELY across the set — trades, tech, military, service industry, creative, medical, corporate, gig work; never repeat a job within a game, and do not default to nurse/teacher/trainer. ' +
       'Return ONLY a JSON array — no markdown, no commentary.',
       `Write ${count} distinct dating profiles as a JSON array. Each object has EXACTLY these keys:\n` +
       `"name" (common American female first name, all different), "age" (21-29), ` +

@@ -3511,7 +3511,7 @@ function renderSsWriteTV() {
   }
 
   /* ================= PROFILE REVIEW (mode: review) ================= */
-  const PR_BUILD_MS = 90000;
+  const PR_BUILD_MS = 180000;
   const PR_PERSONAS = [['romantic', '💗', 'The Romantic'], ['savage', '🔪', 'The Savage'], ['unhinged', '🤪', 'The Unhinged One']];
 
   const prScoreStrip = () => {
@@ -4483,9 +4483,9 @@ function renderSsWrite() {
 
   // phone-side countdown (90s write clock, mirrors the TV)
   let ssPTick = null;
-  function ssStartPhoneTimer() {
+  function ssStartPhoneTimer(ms) {
     clearInterval(ssPTick);
-    const end = Date.now() + 90000;
+    const end = Date.now() + (ms || 90000);
     const tick = () => {
       const t = $('#ssPTimer');
       if (!t) { clearInterval(ssPTick); return; }
@@ -4520,7 +4520,7 @@ function renderSsWrite() {
       <div id="prPrompts" style="width:100%;margin-top:12px"></div>
       <input type="text" class="cap-ta" id="prBio" maxlength="60" placeholder="bio (optional)" style="min-height:0;height:auto;padding:12px;margin-top:10px">
       <button class="btn big" id="prSubmit" style="width:100%;margin-top:14px" disabled>Submit to the panel ▶</button>`;
-    ssStartPhoneTimer();
+    ssStartPhoneTimer(180000);
     const answers = [{ label: PR_PROMPTS[0], answer: '' }, { label: PR_PROMPTS[1], answer: '' }];
     const pbox = $('#prPrompts');
     answers.forEach((a, i) => {
