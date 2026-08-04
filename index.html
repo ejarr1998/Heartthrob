@@ -3524,6 +3524,32 @@ function renderSsWriteTV() {
     }).join('') + `</div>`;
   };
 
+  // plays a voice and resolves when it ACTUALLY finishes (audio element 'ended'; speechSynthesis 'onend')
+  function prVoiceDone(url, text) {
+    return new Promise(res => {
+      let done = false;
+      const fin = () => { if (!done) { done = true; res(); } };
+      setTimeout(fin, 35000);   // safety net
+      if (url) {
+        const a = new Audio();
+        a.onended = fin; a.onerror = fin;
+        a.src = url;
+        a.play().catch(fin);
+      } else if (text) {
+        try {
+          speechSynthesis.cancel();
+          const u = new SpeechSynthesisUtterance(text);
+          u.rate = 1.02; u.pitch = 1.1;
+          const vs = speechSynthesis.getVoices();
+          const fv = vs.find(v => /female|samantha|victoria|zira|karen|moira|tessa|fiona|serena|allison|ava|susan/i.test(v.name));
+          if (fv) u.voice = fv;
+          u.onend = fin; u.onerror = fin;
+          speechSynthesis.speak(u);
+        } catch (e) { fin(); }
+      } else fin();
+    });
+  }
+
   function prMockVerdicts(name) {
     return {
       romantic: { swipe: Math.random() < .7 ? 'right' : 'left', comment: `${name}, I genuinely see something sweet here. I would give him a chance.`, audioUrl: null },
@@ -3605,8 +3631,7 @@ function renderSsWriteTV() {
         `<div class="pr-persona">${emoji} <b>${label}</b></div><div class="pr-comment">“${esc(v.comment)}”</div><div class="pr-stamp" style="display:none"></div>`);
       panel.style.animation = 'slideUp .5s both';
       $('#prPanel').appendChild(panel);
-      if (v.audioUrl) VOICE.sayUrl(v.audioUrl); else speakHer(v.comment || '');
-      await sleep(Math.min(8500, 2800 + (v.comment || '').length * 70));
+      await prVoiceDone(v.audioUrl, v.comment);   // stamp waits for her to FINISH talking
       const right = v.swipe === 'right';
       if (right) rights++;
       const stamp = panel.querySelector('.pr-stamp');
@@ -3680,8 +3705,8 @@ function renderSsWriteTV() {
       const b = el('div', 'pr-verdict', `<div class="pr-persona">${meta[0]} <b>${meta[1]}</b></div><div class="pr-comment">“${esc(line.text)}”</div>`);
       b.style.animation = 'slideUp .45s both';
       chat.appendChild(b);
-      if (line.audioUrl) VOICE.sayUrl(line.audioUrl); else speakHer(line.text || '');
-      await sleep(Math.min(7500, 2400 + (line.text || '').length * 65));
+      await prVoiceDone(line.audioUrl, line.text);   // she finishes before the next girl fires back
+      await sleep(400);
     }
     const champ = room.players[deb.winnerPid] || {};
     const crown = el('div', 'ss-line', `👑 “${esc(deb.crownLine || '')}”
@@ -3689,8 +3714,7 @@ function renderSsWriteTV() {
     crown.style.cssText = 'margin-top:14px;animation:megaIn .6s both;max-width:min(1000px,88vw)';
     $('#prCrown').appendChild(crown);
     SFX.play('gold');
-    if (deb.crownAudioUrl) VOICE.sayUrl(deb.crownAudioUrl); else speakHer(deb.crownLine || '');
-    await sleep(Math.min(8000, 3200 + (deb.crownLine || '').length * 70));
+    await prVoiceDone(deb.crownAudioUrl, deb.crownLine);
     const nextBtn = el('button', 'btn big gold', 'Final results ▶');
     nextBtn.style.cssText = 'margin-top:20px;font-size:clamp(18px,1.8vw,26px)';
     stage().appendChild(nextBtn);

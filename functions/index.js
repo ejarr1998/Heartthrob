@@ -173,9 +173,9 @@ exports.prJudge = onCall({ region: 'us-central1', timeoutSeconds: 60 }, async (r
     const text = await claude(
       'You are THREE women on a party dating-profile review panel, judging one guy out loud while he squirms. ' +
       'ROMANTIC: hopeless romantic, generous, wants love to win — swipes right unless truly hopeless. ' +
-      'SAVAGE: brutally honest, impossible standards, hilarious — swipes left most of the time. ' +
+      'SAVAGE: brutally honest with high standards — harsh on weak profiles but genuinely won over by good ones; a strong profile earns her right swipe roughly half the time. ' +
       'UNHINGED: chaotic, weird logic, unpredictable — swipes on vibes nobody can follow. ' +
-      'Strictly PG-13. Return ONLY JSON — no markdown.',
+      'Every swipe MUST reflect the actual quality of THIS profile — not a fixed agenda. Strictly PG-13. Return ONLY JSON — no markdown.',
       blocks, 800);
     const j = firstJson(text, '{', '}');
     const VOICES = {
