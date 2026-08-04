@@ -70,7 +70,7 @@ exports.ssProfiles = onCall({ region: 'us-central1', timeoutSeconds: 40 }, async
       '(gym girl, nurse, lawyer, party girl, teacher, influencer, barista, film snob…). ' +
       'Return ONLY a JSON array — no markdown, no commentary.',
       `Write ${count} distinct dating profiles as a JSON array. Each object has EXACTLY these keys:\n` +
-      `"name" (common American female first name, all different), "age" (21-29), "job" (3-6 words, may be funny), ` +
+      `"name" (common American female first name, all different), "age" (21-29), "job" (a plain realistic job title, 1-4 words, NOT a joke, no commentary — e.g. "ER Nurse", "Law Student"), ` +
       `"vibe" (one short line), "looking_for" (short), "dealbreaker" (short, funny), ` +
       `"greeting" (one flirty, challenging sentence she says to the players, max 15 words).`,
       1400);
