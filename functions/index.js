@@ -13,7 +13,7 @@ initializeApp();
 const ANTHROPIC_KEY = () => process.env.ANTHROPIC_KEY || '';
 const ELEVENLABS_KEY = () => process.env.ELEVENLABS_KEY || '';
 const ELEVENLABS_VOICE = () => process.env.ELEVENLABS_VOICE || 'EXAVITQu4vr4xnSDxMaL';   // "Sarah"
-const CLAUDE_MODEL = 'claude-haiku-4-5-20251001';
+const CLAUDE_MODEL = 'claude-sonnet-5';
 
 async function claude(system, user, maxTokens) {
   const r = await fetch('https://api.anthropic.com/v1/messages', {
