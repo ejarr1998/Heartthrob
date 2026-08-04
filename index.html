@@ -3089,7 +3089,7 @@ const TV = (() => {
      Works with zero backend: falls back to a local mock if the Cloud
      Function isn't deployed / has no keys yet.
   ================================================================ */
-  const SS_ROUNDS = 5, SS_WRITE_MS = 60000;
+  const SS_ROUNDS = 5, SS_WRITE_MS = 90000;
   const SS_CONSTRAINTS = [
     'QUESTIONS ONLY — your line must be a question.',
     'EXACTLY SIX WORDS — she will count.',
@@ -3227,9 +3227,12 @@ const TV = (() => {
       constraint: k.roundTypes[k.round] === 'constraint' ? k.constraint : null,
       lines: Object.entries(lines).map(([pid2, text]) => ({ pid: pid2, name: (room.players[pid2] || {}).name || '???', text }))
     };
+    await sleep(1500);   // grace: let partial lines flushed at time-up land
+    const lines2 = (room.shoot || {}).lines || {};
+    payload.lines = Object.entries(lines2).map(([pid2, text]) => ({ pid: pid2, name: (room.players[pid2] || {}).name || '???', text }));
     let res = await aiCall('ssJudge', payload, 25000);
-    if (!res || !res.winnerPid || !lines[res.winnerPid]) res = ssMockJudge(payload);
-    if (!res.winnerText) res.winnerText = lines[res.winnerPid];
+    if (!res || !res.winnerPid || !lines2[res.winnerPid]) res = ssMockJudge(payload);
+    if (!res.winnerText) res.winnerText = lines2[res.winnerPid];
     await R().update({ 'shoot/result': res, state: 'ssReveal' });
   }
 
@@ -3262,12 +3265,13 @@ const TV = (() => {
       u[`shoot/scores/${winner}`] = ((k.scores || {})[winner] || 0) + (finale ? 200 : 100);
       u['shoot/hall'] = [...(k.hall || []), { pid: winner, text: res.winnerText || '', prof: prof.name }];
     }
-    await sleep(3600);
-    if (k.round + 1 < SS_ROUNDS) {
-      await R().update({ ...u, state: 'ssWrite', 'shoot/round': k.round + 1, 'shoot/lines': null, 'shoot/result': null });
-    } else {
-      await R().update({ ...u, state: 'ssFinal' });
-    }
+    await sleep(2600);
+    await R().update(u);   // bank the points, but stay here until the host says go
+    const last = k.round + 1 >= SS_ROUNDS;
+    const nextBtn = el('button', 'btn big gold', last ? 'Final results ▶' : 'Next round ▶');
+    nextBtn.style.cssText = 'margin-top:20px;font-size:clamp(18px,1.8vw,26px)';
+    stage().appendChild(nextBtn);
+    nextBtn.onclick = () => { nextBtn.disabled = true; SFX.play('whoosh'); ssAdvance(k.round); };
   }
 
   function renderSsFinal() {
@@ -3452,9 +3456,9 @@ const Player = (() => {
     else if (st === 'ccReveal') stage().innerHTML = waitingCard('🥁', 'Results on the TV!', 'Watch who wrote what…');
     else if (st === 'ccFinal') renderCcFinalPhone();
     else if (st === 'ssWrite') renderSsWrite();
-    else if (st === 'ssJudge') stage().innerHTML = waitingCard('💭', "She's reading every line…", 'Sweat it out.');
-    else if (st === 'ssReveal') stage().innerHTML = waitingCard('💬', 'Her answer is on the TV!', 'Somebody is getting a number…');
-    else if (st === 'ssFinal') renderSsFinalPhone();
+    else if (st === 'ssJudge') { ssFlushDraft(); stage().innerHTML = waitingCard('💭', "She's reading every line…", 'Sweat it out.'); }
+    else if (st === 'ssReveal') { ssFlushDraft(); stage().innerHTML = waitingCard('💬', 'Her answer is on the TV!', 'Somebody is getting a number…'); }
+    else if (st === 'ssFinal') { ssFlushDraft(); renderSsFinalPhone(); }
   }
 
   function renderAwardsWatch() {
@@ -4061,8 +4065,17 @@ const Player = (() => {
       <textarea class="cap-ta" id="ssTa" maxlength="80" placeholder="your pickup line… (80 chars)"></textarea>
       <button class="btn big" id="ssGo" style="width:100%;margin-top:12px" disabled>Send it ▶</button>`;
     const ta = $('#ssTa'), btn = $('#ssGo');
-    ta.oninput = () => { btn.disabled = !ta.value.trim(); };
-    btn.onclick = () => { const t = ta.value.trim(); if (t) { btn.disabled = true; R().child('shoot/lines/' + pid).set(t); } };
+    ssDraft = '';
+    ta.oninput = () => { ssDraft = ta.value; btn.disabled = !ta.value.trim(); };
+    btn.onclick = () => { const t = ta.value.trim(); if (t) { btn.disabled = true; ssDraft = ''; R().child('shoot/lines/' + pid).set(t); } };
+  }
+
+  // time-up safety net: whatever was typed counts
+  let ssDraft = '';
+  function ssFlushDraft() {
+    const t = ssDraft.trim(), k = room.shoot || {};
+    if (t && !(k.lines || {})[pid]) R().child('shoot/lines/' + pid).set(t);
+    ssDraft = '';
   }
 
   function renderSsFinalPhone() {
