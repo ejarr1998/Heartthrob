@@ -70,8 +70,11 @@ exports.ssProfiles = onCall({ region: 'us-central1', timeoutSeconds: 40 }, async
       '(gym girl, nurse, lawyer, party girl, teacher, influencer, barista, film snob…). ' +
       'Return ONLY a JSON array — no markdown, no commentary.',
       `Write ${count} distinct dating profiles as a JSON array. Each object has EXACTLY these keys:\n` +
-      `"name" (common American female first name, all different), "age" (21-29), "job" (a plain realistic job title, 1-4 words, NOT a joke, no commentary — e.g. "ER Nurse", "Law Student"), ` +
-      `"vibe" (one short line), "looking_for" (short), "dealbreaker" (short, funny), ` +
+      `"name" (common American female first name, all different), "age" (21-29), ` +
+      `"job" (plain realistic job title, 1-4 words, NOT a joke — e.g. "ER Nurse", "Law Student"), ` +
+      `"education" (short — e.g. "ASU", "Community College", "Trade School", "U of A"), ` +
+      `"height" (written like 5\'4"), "location" (a neighborhood or area — e.g. "Old Town", "Downtown"), ` +
+      `"prompts" (array of EXACTLY 2 objects {"label", "answer"} — label MUST be picked from this list: "My simple pleasures", "I want someone who", "Together, we could", "I'm known for", "Don't hate me if I", "The way to win me over", "Green flags I look for"; answer is 4-14 words, first person, specific, playful, sounds like a real 24-year-old wrote it, no cliches), ` +
       `"greeting" (one flirty, challenging sentence she says to the players, max 15 words).`,
       1400);
     const arr = firstJson(text, '[', ']');
@@ -96,8 +99,9 @@ exports.ssJudge = onCall({ region: 'us-central1', timeoutSeconds: 60 }, async (r
   try {
     const list = d.lines.map(l => `- pid "${l.pid}" (${l.name}): "${l.text}"`).join('\n');
     const text = await claude(
-      `You are ${p.name}, ${p.age}, ${p.job}. ${p.vibe}. You are looking for: ${p.looking_for}. ` +
-      `Dealbreaker: ${p.dealbreaker}. A group of guys at a party each typed you one pickup line. ` +
+      `You are ${p.name}, ${p.age}, ${p.job} from ${p.location}. ` +
+      (p.prompts || []).map(pr => `On your dating profile, under "${pr.label}", you wrote: "${pr.answer}". `).join('') +
+      'A group of guys at a party each typed you one pickup line. ' +
       'You are witty, flirty, savage but not cruel, strictly PG-13. Return ONLY JSON — no markdown.',
       `${RULES[d.roundType] || RULES.standard}\n\nThe lines:\n${list}\n\n` +
       'Return JSON with EXACTLY these keys:\n' +

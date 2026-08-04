@@ -594,6 +594,7 @@ input[type=text]::placeholder{color:#6E5CA8;font-weight:600}
 .ss-card-body{padding:16px 20px 20px;display:flex;flex-direction:column;gap:14px}
 .ss-prompt{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:13px 18px}
 .ss-prompt-lbl{font-size:clamp(10px,.85vw,13px);font-weight:800;letter-spacing:.16em;color:var(--muted);text-transform:uppercase}
+.ss-prompt.comment{border-color:rgba(255,90,120,.45);background:rgba(255,90,120,.06)}
 .ss-prompt-ans{margin-top:6px;font-weight:800;font-size:clamp(17px,1.85vw,28px);line-height:1.22;color:var(--rose);text-wrap:balance}
 .ss-pillrow{display:flex;flex-wrap:wrap;gap:8px}
 .ss-pill{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:7px 14px;font-weight:700;font-size:clamp(12px,1.05vw,16px)}
@@ -1710,9 +1711,10 @@ const TV = (() => {
   }
 
   let hbTimer = null;
-  let idleKey = '', idleTimer = null, idleFires = 0, idleHoldout = null;
-  function armIdle(k, active, holdoutPid) {
+  let idleKey = '', idleTimer = null, idleFires = 0, idleHoldout = null, idleDelay = 30000;
+  function armIdle(k, active, holdoutPid, delayMs) {
     idleHoldout = holdoutPid || null;
+    idleDelay = delayMs || 30000;
     if (k !== idleKey) { idleKey = k; idleFires = 0; if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; } }
     if (!active) { if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; } return; }
     if (!idleTimer && idleFires < 2) {
@@ -1721,8 +1723,8 @@ const TV = (() => {
         // Gabe stalling gets his personal nags: gabeone first, gabethree second
         if (idleHoldout && vpackOf(idleHoldout) === 'gabe') VOICE.say(idleFires === 1 ? 'gabeone' : 'gabethree');
         else VOICE.any(['vo_hurry_1', 'vo_hurry_2']);
-        armIdle(idleKey, true, idleHoldout);
-      }, 30000);   // nag after 30s idle (was 45s), max 2 per screen
+        armIdle(idleKey, true, idleHoldout, idleDelay);
+      }, idleDelay);   // nag after idle, max 2 per screen
     }
   }
   /* ---------- render dispatcher ---------- */
@@ -1771,7 +1773,7 @@ const TV = (() => {
     } else if (st === 'ssWrite') {
       const k = room.shoot;
       const missing = players().filter(([pid]) => !(k.lines || {})[pid]);
-      armIdle('ssW:' + k.round, missing.length > 0, missing.length === 1 ? missing[0][0] : null);
+      armIdle('ssW:' + k.round, missing.length > 0, missing.length === 1 ? missing[0][0] : null, 52000);   // profile reveal eats ~9s before the clock starts
     } else armIdle('none', false);
     // sudden-death heartbeat: only while a rematch duel is being picked
     const wantHB = st === 'sdDuel' && room.showdown && room.showdown.duel && room.showdown.duel.rematch;
@@ -3132,14 +3134,38 @@ const TV = (() => {
     'NO COMPLIMENTS — neg her or get creative.'
   ];
   const SS_MOCK_PROFILES = [
-    { name: 'Kaylee', age: 24, job: 'Pilates instructor', vibe: 'Will ask your sign before your name', looking_for: "A man who doesn't live with his mom", dealbreaker: 'Owns a vape', greeting: "Okay, impress me. And if you say 'hey', I'm leaving." },
-    { name: 'Brooke', age: 26, job: 'ER nurse', vibe: 'Has seen things. Rates your pain tolerance.', looking_for: 'Emotional availability and a truck', dealbreaker: 'Says "let\'s just see where this goes"', greeting: 'I just got off a 12-hour shift. Make it worth my time.' },
-    { name: 'Madison', age: 23, job: '"Entrepreneur"', vibe: 'Bio says CEO of a company with 3 followers', looking_for: 'Someone tall, obviously', dealbreaker: "Under 6 feet. She is 5'2\".", greeting: "Before you ask: yes, the business is doing great. No, you can't see the numbers." },
-    { name: 'Jess', age: 27, job: 'Third-grade teacher', vibe: 'Sweet until proven otherwise', looking_for: 'A golden retriever in human form', dealbreaker: 'Rude to waiters', greeting: "Hi! Please be normal. Please. I've had a week." },
-    { name: 'Alyssa', age: 25, job: 'Gym girl, protein affiliate', vibe: 'Will make you her content', looking_for: 'A lifting partner with benefits', dealbreaker: 'Skips leg day', greeting: "This better be good. I'm between sets." },
-    { name: 'Courtney', age: 28, job: 'Lawyer, and she will mention it', vibe: 'Cross-examines your stories', looking_for: "Someone who can win an argument. It won't be you.", dealbreaker: 'Being wrong', greeting: 'State your case. You get one shot and I bill by the hour.' },
-    { name: 'Sam', age: 24, job: 'Barista with a film degree', vibe: 'Judging your order AND your taste', looking_for: 'A man who has seen at least one A24 movie', dealbreaker: 'Says Marvel is cinema', greeting: 'Let me guess your order first. Then your personality.' },
-    { name: 'Haley', age: 22, job: 'Senior, communications major', vibe: 'Here for a good time, not a long time', looking_for: 'Concert tickets and chaos', dealbreaker: 'Wants to "stay in tonight"', greeting: 'Okay but why should I pick YOU? Be specific.' }
+    { name: 'Kaylee', age: 24, job: 'Pilates Instructor', education: 'ASU', height: '5\'5"', location: 'Old Town',
+      prompts: [{ label: 'My simple pleasures', answer: 'Sunrise classes, iced coffee, and correcting your form' },
+                { label: "Don't hate me if I", answer: 'Ask your sign before your name' }],
+      greeting: "Okay, impress me. And if you say 'hey', I'm leaving." },
+    { name: 'Brooke', age: 26, job: 'ER Nurse', education: 'Nursing School', height: '5\'6"', location: 'Downtown',
+      prompts: [{ label: 'I want someone who', answer: 'Can handle a 12-hour shift story over dinner' },
+                { label: "I'm known for", answer: 'Keeping calm while everyone else panics' }],
+      greeting: 'I just got off a 12-hour shift. Make it worth my time.' },
+    { name: 'Madison', age: 23, job: 'Marketing Coordinator', education: 'U of A', height: '5\'2"', location: 'Midtown',
+      prompts: [{ label: 'The way to win me over', answer: 'Be tall and actually text back' },
+                { label: 'My simple pleasures', answer: 'Overpriced lattes and winning arguments' }],
+      greeting: "Before you ask: yes, the job is going great. No, you can't see the numbers." },
+    { name: 'Jess', age: 27, job: 'Third-Grade Teacher', education: 'NAU', height: '5\'4"', location: 'Gilbert',
+      prompts: [{ label: 'I want someone who', answer: 'A golden retriever in human form' },
+                { label: "I'm known for", answer: 'Being sweet until proven otherwise' }],
+      greeting: "Hi! Please be normal. Please. I've had a week." },
+    { name: 'Alyssa', age: 25, job: 'Personal Trainer', education: 'Trade School', height: '5\'7"', location: 'North Scottsdale',
+      prompts: [{ label: 'Together, we could', answer: 'Be the couple everyone at the gym hates' },
+                { label: "Don't hate me if I", answer: 'Make you my content' }],
+      greeting: "This better be good. I'm between sets." },
+    { name: 'Courtney', age: 28, job: 'Lawyer', education: 'ASU Law', height: '5\'8"', location: 'Downtown',
+      prompts: [{ label: 'Green flags I look for', answer: 'Can win an argument. It will not be you.' },
+                { label: "I'm known for", answer: 'Cross-examining your stories' }],
+      greeting: 'State your case. You get one shot and I bill by the hour.' },
+    { name: 'Sam', age: 24, job: 'Barista', education: 'Film School', height: '5\'3"', location: 'Tempe',
+      prompts: [{ label: 'My simple pleasures', answer: 'A24 movies and judging your order' },
+                { label: 'The way to win me over', answer: 'Have a Letterboxd with taste' }],
+      greeting: 'Let me guess your order first. Then your personality.' },
+    { name: 'Haley', age: 22, job: 'Student', education: 'GCU', height: '5\'5"', location: 'Campus',
+      prompts: [{ label: 'Together, we could', answer: 'Get concert tickets and cause chaos' },
+                { label: "Don't hate me if I", answer: 'Never want to stay in' }],
+      greeting: 'Okay but why should I pick YOU? Be specific.' }
   ];
 
   // one wrapper for every AI call — null means "backend not ready", callers fall back to the mock
@@ -3259,11 +3285,8 @@ function renderSsWriteTV() {
           <div class="ss-card-photo">${mediaTag(prof.photo)}
             <div class="ss-card-name">${esc(prof.name)}, ${prof.age}</div></div>
           <div class="ss-card-body">
-            <div class="ss-prompt" id="ssPrompt" style="display:none">
-              <div class="ss-prompt-lbl">The way to my heart</div>
-              <div class="ss-prompt-ans">“${esc(prof.greeting)}”</div>
-            </div>
             <div class="ss-pillrow" id="ssPills"></div>
+            <div id="ssPrompts" style="display:flex;flex-direction:column;gap:12px"></div>
           </div>
         </div>
         <div class="tv-sub" id="ssRule" style="margin-top:14px;display:none">${rule}</div>
@@ -3271,19 +3294,29 @@ function renderSsWriteTV() {
       (async () => {
         await sleep(2600);                       // beat 1: just her — face, name, age
         if (!live()) return;
-        const g = $('#ssPrompt'); if (g) { g.style.display = ''; g.style.animation = 'slideUp .5s both'; }
-        await sleep(1400);                       // beat 2: her prompt answer
-        if (!live()) return;
-        const pills = [prof.job, prof.vibe, prof.looking_for, '🚩 ' + prof.dealbreaker];
+        const pills = [prof.job, prof.education, prof.height, prof.location].filter(Boolean);
         const box = $('#ssPills');
-        for (let i = 0; i < pills.length; i++) {   // beat 3: interest pills, one at a time
+        for (let i = 0; i < pills.length; i++) {   // beat 2: her vitals, one at a time
           if (!live()) return;
-          const c = el('span', 'ss-pill' + (i === 3 ? ' red' : ''), esc(pills[i]));
+          const c = el('span', 'ss-pill', esc(pills[i]));
           c.style.animation = 'popIn .35s both';
           if (box) box.appendChild(c);
-          await sleep(400);
+          await sleep(380);
         }
         await sleep(500);
+        if (!live()) return;
+        const pbox = $('#ssPrompts');
+        const cards = (prof.prompts || []).map(pr => ({ lbl: pr.label, ans: pr.answer, cls: '' }));
+        cards.push({ lbl: 'Leave a comment', ans: prof.greeting, cls: ' comment' });   // Hinge's mechanic = our game
+        for (const cd of cards) {                // beat 3: her prompt answers, then the comment card
+          if (!live()) return;
+          const d = el('div', 'ss-prompt' + cd.cls,
+            `<div class="ss-prompt-lbl">${esc(cd.lbl)}</div><div class="ss-prompt-ans">“${esc(cd.ans)}”</div>`);
+          d.style.animation = 'slideUp .5s both';
+          if (pbox) pbox.appendChild(d);
+          await sleep(1400);
+        }
+        await sleep(400);
         if (!live()) return;
         const rb = $('#ssRule'); if (rb) { rb.style.display = ''; rb.style.animation = 'slideUp .4s both'; }
         SFX.play('gold');                        // floor is open — NOW the clock starts
@@ -3317,7 +3350,7 @@ function renderSsWriteTV() {
       await sleep(500);
     }
     const payload = {
-      profile: { name: prof.name, age: prof.age, job: prof.job, vibe: prof.vibe, looking_for: prof.looking_for, dealbreaker: prof.dealbreaker },
+      profile: { name: prof.name, age: prof.age, job: prof.job, education: prof.education, height: prof.height, location: prof.location, prompts: prof.prompts || [], greeting: prof.greeting },
       roundType: k.roundTypes[k.round],
       constraint: k.roundTypes[k.round] === 'constraint' ? k.constraint : null,
       lines: Object.entries(lines).map(([pid2, text]) => ({ pid: pid2, name: (room.players[pid2] || {}).name || '???', text }))
@@ -4192,7 +4225,7 @@ const Player = (() => {
     stage().innerHTML = `
       <div class="phone-title" style="color:var(--rose)">😏 ${esc(prof.name)}, ${prof.age}</div>
       <div class="cap-mini">${mediaTag(prof.photo)}</div>
-      <div class="phone-sub" style="margin-bottom:4px">${esc(prof.job)} · 🚩 ${esc(prof.dealbreaker)}</div>
+      <div class="phone-sub" style="margin-bottom:4px">${esc(prof.job)} · ${esc(prof.location)}</div>
       <div class="phone-sub" style="margin-bottom:12px;color:var(--gold)">${rule}</div>
       <div class="cap-timer" id="ssPTimer" style="font-size:34px;margin-bottom:8px"></div>
       <textarea class="cap-ta" id="ssTa" maxlength="80" placeholder="your pickup line… (80 chars)"></textarea>
