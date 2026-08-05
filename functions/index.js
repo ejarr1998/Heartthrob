@@ -13,7 +13,7 @@ initializeApp();
 const ANTHROPIC_KEY = () => process.env.ANTHROPIC_KEY || '';
 const XAI_KEY = () => process.env.XAI_KEY || '';
 const XAI_MODEL = () => process.env.XAI_MODEL || 'grok-4';          // text (vision-capable)
-const XAI_IMAGE_MODEL = () => process.env.XAI_IMAGE_MODEL || 'grok-2-image';
+const XAI_IMAGE_MODEL = () => process.env.XAI_IMAGE_MODEL || 'grok-2-image-latest';
 const ELEVENLABS_KEY = () => process.env.ELEVENLABS_KEY || '';
 const ELEVENLABS_VOICE = () => process.env.ELEVENLABS_VOICE || 'EXAVITQu4vr4xnSDxMaL';   // "Sarah"
 const CLAUDE_MODEL = 'claude-sonnet-5';
@@ -85,9 +85,15 @@ async function xaiImage(prompt) {
   });
   if (!r.ok) throw new Error('xai image ' + r.status + ': ' + (await r.text()).slice(0, 200));
   const j = await r.json();
-  const b64 = (((j.data || [])[0] || {}).b64_json) || '';
-  if (!b64) throw new Error('xai image: empty response');
-  const buf = Buffer.from(b64, 'base64');
+  const d0 = (j.data || [])[0] || {};
+  let buf = null;
+  if (d0.b64_json) buf = Buffer.from(d0.b64_json, 'base64');
+  else if (d0.url) {   // some xAI responses hand back a URL instead of bytes
+    const ir = await fetch(d0.url);
+    if (!ir.ok) throw new Error('xai image url fetch ' + ir.status);
+    buf = Buffer.from(await ir.arrayBuffer());
+  }
+  if (!buf || !buf.length) throw new Error('xai image: empty response ' + JSON.stringify(j).slice(0, 200));
   const path = `girls/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.jpg`;
   const bucket = getStorage().bucket();
   await bucket.file(path).save(buf, { contentType: 'image/jpeg', public: true });
@@ -156,7 +162,7 @@ exports.ssProfiles = onCall({ region: 'us-central1', timeoutSeconds: 40 }, async
             `Casual candid photo of a ${pr.age || 24}-year-old American woman for a dating app profile, ` +
             `she works as a ${pr.job}. Photorealistic, shot on a phone, natural light, relaxed smile, ` +
             `waist-up, everyday setting (coffee shop, park, apartment), no text, no watermark.`);
-        } catch (e) { console.error('portrait failed for ' + pr.name, e.message); }
+        } catch (e) { console.error('portrait failed for ' + pr.name + ':', e.message); }
       }));
     }
     return { profiles: arr };
