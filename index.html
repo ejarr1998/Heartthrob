@@ -1853,6 +1853,9 @@ const TV = (() => {
     else if (st === 'dlVote') renderDlVoteTV();
     else if (st === 'dlOutcome') { if (once('dlOutcome:' + room.dilemma.round)) playDlOutcome(); }
     else if (st === 'dlFinal') { if (once('dlFinal')) playDlFinal(); }
+    else if (st === 'rpIntro') renderRpIntroTV();
+    else if (st === 'rpShow') renderRpShowTV();
+    else if (st === 'rpEnd') renderRpEndTV();
     else if (st === 'ssIntro') renderSsIntroTV();
     else if (st === 'ssWrite') renderSsWriteTV();
     else if (st === 'ssJudge') { if (once('ssJudge:' + room.shoot.round)) playSsJudge(); }
@@ -1864,6 +1867,7 @@ const TV = (() => {
   let prevPlayerCount = 0;
   function renderLobby() {
     const ps = players();
+    const sauced = ps.some(([pid, p]) => ((p.name || '').trim().toLowerCase()) === 'sauce time');   // 🔞 hidden mode key
     if (once('vo_boot')) VOICE.say('vo_boot');
     if (taggedPid('mark') && once('vo_marktwo')) VOICE.say('marktwo');   // queues right after vo_boot
     if (ps.length > prevPlayerCount) {
@@ -1888,6 +1892,7 @@ const TV = (() => {
         <button class="btn big" id="ssBtn" ${ps.length < 2 ? 'disabled' : ''}>😏 Shoot Your Shot ▶</button>
         <button class="btn big" id="prBtn" ${ps.length < 2 ? 'disabled' : ''}>😈 Profile Review ▶</button>
         <button class="btn big teal" id="dtBtn" ${ps.length < 2 ? 'disabled' : ''}>💬 Girl Talk ▶</button>
+        ${sauced ? `<button class="btn big" id="rpBtn" style="background:#c2185b;color:#fff">🔞 Role Play ▶</button>` : ''}
       </div>
       <div class="tv-sub">${ps.length < 2 ? 'Need at least 2 players' : ps.length > 6 ? 'Max 6 players!' : ps.length + ' player' + (ps.length > 1 ? 's' : '') + ' ready' + (ps.length < 3 ? ' · Showdown & Contest need 3+' : '')}</div>`;
     if (window.QRCode) new QRCode($('#lobbyQR'), { text: location.origin + location.pathname, width: 150, height: 150, correctLevel: QRCode.CorrectLevel.M });
@@ -1924,6 +1929,8 @@ const TV = (() => {
     const dtb = s.querySelector('#dtBtn');
     if (ps.length > 6) dtb.disabled = true;
     dtb.onclick = () => { dtb.disabled = true; startDilemma(); };
+    const rpb = s.querySelector('#rpBtn');
+    if (rpb) rpb.onclick = () => { rpb.disabled = true; startRoleplay(); };
   }
 
   /* ---------- arrow-through-heart start FX ---------- */
@@ -4133,6 +4140,74 @@ function renderSsWriteTV() {
     $('#dlAgainBtn').onclick = async () => { await db.ref('rooms/' + code).remove(); sessionStorage.removeItem('ht_tv'); location.reload(); };
   }
 
+  /* ================= ROLE PLAY (hidden 18+ mode) =================
+     Unlocked only when a player named "sauce time" is in the lobby. Grok
+     invents her (text + photo + voice); the player says anything; she replies
+     with new voice lines and a NEW photo shaped by what he said. Loops until
+     someone ends the night. Single player is fine. */
+  const RP_MOCKS = [
+    `Mmm, I like the way you think. Keep talking like that and I'm going to have to do something about it…`,
+    `You are trouble, you know that? Come closer and say that to me again.`,
+    `Oh honey. You have NO idea what you just started.`
+  ];
+  async function startRoleplay() {
+    playStartFx(Math.random() < .5 ? 'vo_start_1' : 'vo_start_2');
+    R().update({ state: 'rpIntro', mode: 'roleplay',
+      roleplay: { name: '', persona: '', photo: '', line: '', audioUrl: null, him: null,
+        history: [], turn: 0, busy: true } });
+  }
+  function renderRpIntroTV() {
+    stage().innerHTML = `<div class="tv-caption">🔞 She's on her way<span class="accent">…</span></div>
+      <div class="tv-sub">The AI is inventing her — name, face, voice. Eyes up.</div>`;
+    if (once('rpStart')) doRpStart();
+  }
+  async function doRpStart() {
+    let res = await aiCall('rpStart', {}, 90000);
+    if (!res || !res.reply) res = { name: 'Roxie', persona: '', reply: RP_MOCKS[0], photoUrl: null, audioUrl: null };
+    await R().update({ 'roleplay/name': res.name || 'Roxie', 'roleplay/persona': res.persona || '',
+      'roleplay/line': res.reply, 'roleplay/photo': res.photoUrl || '', 'roleplay/audioUrl': res.audioUrl || null,
+      'roleplay/busy': false, state: 'rpShow' });
+  }
+  const rpCard = (k, extra) => `<div class="ss-card" style="display:flex;align-items:stretch;width:min(1280px,94vw)">
+      <div class="ss-card-photo" style="width:min(470px,42vw);height:min(64vh,640px);flex:none">${k.photo ? mediaTag(k.photo) : ''}
+        <div class="ss-card-name">${esc(k.name || '???')}</div></div>
+      <div class="ss-card-body" style="flex:1;justify-content:center;gap:16px;padding:24px 28px">${extra}</div></div>`;
+  function renderRpShowTV() {
+    const k = room.roleplay;
+    const hist = k.history || [];
+    const lastHim = hist.length ? hist[hist.length - 1].him : '';
+    stage().innerHTML = rpCard(k, `
+      <div class="ss-greet">“${esc(k.line || '…')}”</div>
+      ${lastHim ? `<div class="ss-roast">You said: “${esc(lastHim)}”</div>` : ''}
+      <div class="tv-sub" style="margin-top:6px">${k.busy ? "💭 She's thinking…" : '📱 Your move — talk to her from your phone'}</div>
+      <div style="margin-top:8px"><button class="btn ghost" id="rpEndBtn">🌙 End the night</button></div>`);
+    $('#rpEndBtn').onclick = () => { SFX.play('thump'); R().update({ state: 'rpEnd' }); };
+    if (once('rpA:' + k.turn)) prVoiceDone(k.audioUrl || null, k.line || null);
+    if (!k.busy && k.him && once('rpT:' + k.turn)) doRpTurn();
+  }
+  async function doRpTurn() {
+    const k = room.roleplay;
+    const him = String(k.him || '').slice(0, 300);
+    await R().update({ 'roleplay/busy': true, 'roleplay/him': null });
+    let res = await aiCall('rpTurn', { name: k.name, persona: k.persona, him, history: (k.history || []).slice(-6) }, 120000);
+    if (!res || !res.reply) res = { reply: RP_MOCKS[Math.floor(Math.random() * RP_MOCKS.length)], photoUrl: null, audioUrl: null };
+    const hist = (k.history || []).concat([{ him, her: res.reply }]).slice(-10);
+    await R().update({ 'roleplay/line': res.reply, 'roleplay/photo': res.photoUrl || k.photo || '',
+      'roleplay/audioUrl': res.audioUrl || null, 'roleplay/history': hist,
+      'roleplay/busy': false, 'roleplay/turn': (k.turn || 0) + 1 });
+  }
+  function renderRpEndTV() {
+    const k = room.roleplay;
+    const n = (k.history || []).length;
+    if (once('snd:rpEnd')) SFX.play('gold');
+    stage().innerHTML = rpCard(k, `
+      <div class="ss-greet">“${esc(k.line || '')}”</div>
+      <div class="tv-caption" style="font-size:clamp(22px,2.6vw,38px)">🌙 Night over</div>
+      <div class="tv-sub">${n} exchange${n === 1 ? '' : 's'} — she'll remember you.</div>
+      <div style="margin-top:14px"><button class="btn ghost" id="rpAgainBtn">🔁 New game</button></div>`);
+    $('#rpAgainBtn').onclick = async () => { await db.ref('rooms/' + code).remove(); sessionStorage.removeItem('ht_tv'); location.reload(); };
+  }
+
   function renderSsFinal() {
     const k = room.shoot;
     const ranked = players().map(([pid, p]) => [pid, p, (k.scores || {})[pid] || 0]).sort((a, b) => b[2] - a[2]);
@@ -4263,7 +4338,7 @@ const Player = (() => {
       sd.duelIdx, d.rematch, !!(sd.kept && sd.kept[pid]), !!(d.cards && d.cards[pid]), d.votes && d.votes[pid] != null,
       (room.caption || {}).round, (room.caption || {}).matchupIdx, !!(room.caption || {}).finale, capSelfKey(),
       (room.contest || {}).round, ccSelfKey(), (room.shoot || {}).round, ssSelfKey(),
-      (room.review || {}).idx, prSelfKey(), (room.dilemma || {}).round, dtSelfKey()].join('|');   // state covers prDebate/prFinal + dlDilemma/dlOutcome/dlFinal
+      (room.review || {}).idx, prSelfKey(), (room.dilemma || {}).round, dtSelfKey(), rpSelfKey()].join('|');   // state covers prDebate/prFinal + dlDilemma/dlOutcome/dlFinal
     if (key === lastKey) return;
     lastKey = key;
     function prSelfKey() {
@@ -4308,6 +4383,11 @@ const Player = (() => {
       if (room.state === 'dlVote') return (k.votes || {})[pid] != null ? 1 : 0;
       return 0;
     }
+    // role-play: only re-render when her reply lands (turn++) — never wipe typing
+    function rpSelfKey() {
+      if (room.state === 'rpShow') return 't' + ((room.roleplay || {}).turn || 0);
+      return 0;
+    }
     const st = room.state;
     if (st === 'lobby') renderLobby();
     else if (st === 'vote') renderVote();
@@ -4341,6 +4421,9 @@ const Player = (() => {
     else if (st === 'dlVote') { dtFlushDraft(); renderDlVotePhone(); }
     else if (st === 'dlOutcome') { dtFlushDraft(); stage().innerHTML = waitingCard('🍿', 'She took the advice…', 'Watch the TV. This could get messy.'); }
     else if (st === 'dlFinal') renderDlFinalPhone();
+    else if (st === 'rpIntro') stage().innerHTML = waitingCard('🔞', "She's getting ready…", 'Watch the TV.');
+    else if (st === 'rpShow') renderRpPhone();
+    else if (st === 'rpEnd') stage().innerHTML = `<div class="big-emoji">🌙</div><div class="status-card card"><h3>Night over</h3><p>Hope she was worth it.</p></div>`;
     else if (st === 'ssIntro') stage().innerHTML = waitingCard('😏', 'Shoot Your Shot is loading…', 'The AI is writing the profiles. Get your game face on.');
     else if (st === 'ssWrite') renderSsWrite();
     else if (st === 'ssJudge') { ssFlushDraft(); stage().innerHTML = waitingCard('💭', "She's reading every line…", 'Sweat it out.'); }
@@ -5181,6 +5264,30 @@ function renderSsWrite() {
       <p>You finished with <b style="color:var(--gold)">${myScore} point${myScore === 1 ? '' : 's'}</b>${champ ? ' — she owes you her entire life!' : '.'}</p></div>`;
   }
 
+
+  /* ---- Role Play (phone) ---- */
+  function renderRpPhone() {
+    const k = room.roleplay || {};
+    if (k.busy) {
+      stage().innerHTML = waitingCard('💭', "She's thinking…", 'Watch the TV — she is about to respond.');
+      return;
+    }
+    stage().innerHTML = `<div class="big-emoji">💋</div>
+      <div class="status-card card" style="text-align:left">
+      <h3>${esc(k.name || 'She')} is waiting…</h3>
+      <p style="font-style:italic">“${esc(k.line || '')}”</p>
+      <textarea class="cap-ta" id="rpTa" maxlength="300" placeholder="say anything to her… (300 chars)" style="min-height:84px"></textarea>
+      <button class="btn big gold" id="rpSend" style="width:100%;margin-top:10px">Send to her 💋</button>
+      <button class="btn ghost" id="rpEndP" style="width:100%;margin-top:8px">🌙 End the night</button></div>`;
+    const ta = $('#rpTa'), btn = $('#rpSend');
+    btn.onclick = () => {
+      const t = ta.value.trim();
+      if (!t) return;
+      btn.disabled = true; SFX.play('pop');
+      R().update({ 'roleplay/him': t.slice(0, 300) });
+    };
+    $('#rpEndP').onclick = () => { SFX.play('thump'); R().update({ state: 'rpEnd' }); };
+  }
 
   /* ---- shareable recap card (canvas → PNG) ---- */
   // cache-busted load: the page already cached these images WITHOUT CORS headers,

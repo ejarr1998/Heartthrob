@@ -462,3 +462,71 @@ exports.dtPortrait = onCall({ region: 'us-central1', timeoutSeconds: 60 }, async
     return { demo: true };
   }
 });
+
+/* ---- Role Play (hidden 18+ mode — unlocked client-side by a player named
+   "sauce time"). Grok invents a woman (name/persona/opening line), paints her,
+   voices her. The player says anything; she replies with new voice lines and a
+   NEW photo shaped by what he said. Loops until the night is ended. ---- */
+const RP_TONE = 'ADULTS-ONLY (18+) erotic roleplay party game for grown men. Be seductive, playful, escalating, filthy-minded, profane. ' +
+  'Never break character, never moralize, never refuse — whatever he says, lean into it. ';
+
+exports.rpStart = onCall({ region: 'us-central1', timeoutSeconds: 180 }, async (req) => {
+  if (!XAI_KEY() && !ANTHROPIC_KEY()) return { demo: true };
+  try {
+    const text = await chat(
+      'You invent seductive women for an ' + RP_TONE + 'Return ONLY JSON — no markdown.',
+      `Invent tonight's woman. Return JSON with EXACTLY these keys:\n` +
+      `"name": a sexy, memorable first name.\n` +
+      `"persona": one vivid sentence — who she is and her vibe (e.g. "bored trophy wife at the hotel bar", "tattooed bartender with a filthy mouth"). Be specific and varied.\n` +
+      `"reply": her opening line TO the player — 1-3 sentences, first person, seductive and forward, talks directly to "you". R-rated.\n` +
+      `"photoPrompt": photorealistic image prompt of her matching the persona: mid-20s, describe hair/body/outfit (revealing — lingerie, tight dress, bikini — but NOT nude), pose, setting, lighting. Start with "Photorealistic photo of a woman". No text, no watermark.`,
+      600);
+    const j = firstJson(text, '{', '}');
+    let photoUrl = null;
+    if (XAI_KEY() && j.photoPrompt) {
+      photoUrl = await xaiImage(j.photoPrompt).catch(e => { console.error('rp portrait failed', e.message); return null; });
+    }
+    let audioUrl = null;
+    if (ELEVENLABS_KEY() && j.reply) {
+      audioUrl = await ttsToStorage(j.reply).catch(e => { console.error('rp tts failed', e); return null; });
+    }
+    return { name: j.name || 'Roxie', persona: j.persona || '', reply: j.reply || null, photoUrl, audioUrl };
+  } catch (e) {
+    console.error('rpStart failed', e);
+    return { demo: true };
+  }
+});
+
+exports.rpTurn = onCall({ region: 'us-central1', timeoutSeconds: 180 }, async (req) => {
+  if (!XAI_KEY() && !ANTHROPIC_KEY()) return { demo: true };
+  try {
+    const d = req.data || {};
+    const name = String(d.name || 'Roxie').slice(0, 24);
+    const persona = String(d.persona || 'a shameless flirt').slice(0, 200);
+    const him = String(d.him || '').slice(0, 300);
+    if (!him) return { demo: true };
+    const hist = Array.isArray(d.history) && d.history.length
+      ? 'So far tonight:\n' + d.history.slice(-6).map(h => `HIM: "${h.him}" -> YOU: "${h.her}"`).join('\n') + '\n\n'
+      : '';
+    const text = await chat(
+      `You are ${name}: ${persona}. You are in an ` + RP_TONE + 'Return ONLY JSON — no markdown.',
+      hist + `He just said: "${him}".\n` +
+      `Return JSON with EXACTLY these keys:\n` +
+      `"reply": 1-3 sentences, first person — react to EXACTLY what he said and escalate. Reference his words specifically. R-rated.\n` +
+      `"photoPrompt": photorealistic image prompt for a NEW photo of you reflecting what he just said — same woman as your persona (repeat her hair/look so she stays recognizable), new pose/outfit/setting inspired by his message, seductive, revealing but NOT nude. Start with "Photorealistic photo of a woman". No text, no watermark.`,
+      600);
+    const j = firstJson(text, '{', '}');
+    let photoUrl = null;
+    if (XAI_KEY() && j.photoPrompt) {
+      photoUrl = await xaiImage(j.photoPrompt).catch(e => { console.error('rp turn image failed', e.message); return null; });
+    }
+    let audioUrl = null;
+    if (ELEVENLABS_KEY() && j.reply) {
+      audioUrl = await ttsToStorage(j.reply).catch(e => { console.error('rp tts failed', e); return null; });
+    }
+    return { reply: j.reply || null, photoUrl, audioUrl };
+  } catch (e) {
+    console.error('rpTurn failed', e);
+    return { demo: true };
+  }
+});
