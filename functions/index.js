@@ -13,7 +13,7 @@ initializeApp();
 const ANTHROPIC_KEY = () => process.env.ANTHROPIC_KEY || '';
 const XAI_KEY = () => process.env.XAI_KEY || '';
 const XAI_MODEL = () => process.env.XAI_MODEL || 'grok-4';          // text (vision-capable)
-const XAI_IMAGE_MODEL = () => process.env.XAI_IMAGE_MODEL || 'grok-2-image-latest';
+const XAI_IMAGE_MODEL = () => process.env.XAI_IMAGE_MODEL || 'grok-imagine-image';
 const ELEVENLABS_KEY = () => process.env.ELEVENLABS_KEY || '';
 const ELEVENLABS_VOICE = () => process.env.ELEVENLABS_VOICE || 'EXAVITQu4vr4xnSDxMaL';   // "Sarah"
 const CLAUDE_MODEL = 'claude-sonnet-5';
