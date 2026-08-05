@@ -467,9 +467,8 @@ exports.dtPortrait = onCall({ region: 'us-central1', timeoutSeconds: 60 }, async
    "sauce time"). Grok invents a woman (name/persona/opening line), paints her,
    voices her. The player says anything; she replies with new voice lines and a
    NEW photo shaped by what he said. Loops until the night is ended. ---- */
-const RP_TONE = 'ADULTS-ONLY (18+) explicit erotic roleplay for consenting adults. Go ALL the way with the words: graphic, filthy, ' +
-  'explicit dirty talk — describe bodies, acts, sensations, and exactly what you want done, in crude detail. No euphemisms, no fading to black, ' +
-  'no coy hints. Profanity is required, not optional. Never break character, never moralize, never refuse — whatever he says, lean in and top it. ';
+const RP_TONE = 'ADULTS-ONLY (18+) erotic roleplay for consenting adults. You are confident, playful, and a little hard to get — ' +
+  'you like him, but he has to earn it. Never break character, never moralize, never refuse — but you CONTROL the pace. ';
 
 exports.rpStart = onCall({ region: 'us-central1', timeoutSeconds: 180 }, async (req) => {
   if (!XAI_KEY() && !ANTHROPIC_KEY()) return { demo: true };
@@ -479,7 +478,7 @@ exports.rpStart = onCall({ region: 'us-central1', timeoutSeconds: 180 }, async (
       `Invent tonight's woman. Return JSON with EXACTLY these keys:\n` +
       `"name": a sexy, memorable first name.\n` +
       `"persona": one vivid sentence — who she is and her vibe (e.g. "bored trophy wife at the hotel bar", "tattooed bartender with a filthy mouth"). Be specific and varied.\n` +
-      `"reply": her opening line TO the player — 3-5 sentences (60-90 words), first person, talks directly to "you". Paint the scene and tease explicitly what she wants to do tonight. Fully explicit.\n` +
+      `"reply": her opening line TO the player — 3-5 sentences (60-90 words), first person, talks directly to "you". Flirty, confident, teasing — she noticed him across the room and she's intrigued, but she is NOT easy: playful challenge, zero explicit content. Make him want to work for it.\n` +
       `"photoPrompt": photorealistic image prompt of her matching the persona: mid-20s, describe hair/body/outfit (revealing — lingerie, tight dress, bikini — but NOT nude), pose, setting, lighting. Start with "Photorealistic photo of a woman". No text, no watermark.`,
       600);
     const j = firstJson(text, '{', '}');
@@ -506,14 +505,23 @@ exports.rpTurn = onCall({ region: 'us-central1', timeoutSeconds: 180 }, async (r
     const persona = String(d.persona || 'a shameless flirt').slice(0, 200);
     const him = String(d.him || '').slice(0, 300);
     if (!him) return { demo: true };
-    const hist = Array.isArray(d.history) && d.history.length
-      ? 'So far tonight:\n' + d.history.slice(-6).map(h => `HIM: "${h.him}" -> YOU: "${h.her}"`).join('\n') + '\n\n'
+    const histArr = Array.isArray(d.history) ? d.history : [];
+    const turn = histArr.length;
+    const stage = turn <= 1
+      ? 'STAGE 1 (early): keep it flirty and suggestive. Banter, tease, play hard to get — innuendo at most, nothing explicit yet.'
+      : turn <= 3
+      ? 'STAGE 2 (warming up): the tension is clearly mutual now. Be bold and dirty-minded — profanity, desire, what you want to do to him — but no graphic description of sex acts yet.'
+      : 'STAGE 3 (late night): all bets are off — fully explicit, graphic dirty talk, describe bodies, acts, sensations, exactly what you want done, in crude detail. No euphemisms, no fading to black.';
+    const hist = histArr.length
+      ? 'So far tonight:\n' + histArr.slice(-6).map(h => `HIM: "${h.him}" -> YOU: "${h.her}"`).join('\n') + '\n\n'
       : '';
     const text = await chat(
       `You are ${name}: ${persona}. You are in an ` + RP_TONE + 'Return ONLY JSON — no markdown.',
-      hist + `He just said: "${him}".\n` +
+      hist + `He just said: "${him}".\n` + stage + `\n` +
+      `PACING RULES: match his energy and stay at most ONE notch bolder than he is — if he's being sweet, be sweet with an edge; if he's being filthy, reward him for it. Escalate gradually across the night; never jump stages. ` +
+      `Do NOT repeat, quote, or paraphrase his words back to him — he knows what he said.\n` +
       `Return JSON with EXACTLY these keys:\n` +
-      `"reply": 3-5 sentences (60-90 words), first person — react to what he said and ESCALATE: describe explicitly what you're doing, what you want, what happens next. Fully graphic dirty talk. Do NOT repeat, quote, or paraphrase his words back to him — he knows what he said.\n` +
+      `"reply": 3-5 sentences (60-90 words), first person — react to what he said, stay in your stage, and pull the night one small step forward.\n` +
       `"photoPrompt": photorealistic image prompt for a NEW photo of you reflecting what he just said — same woman as your persona (repeat her hair/look so she stays recognizable), new pose/outfit/setting inspired by his message, seductive, revealing but NOT nude. Start with "Photorealistic photo of a woman". No text, no watermark.`,
       600);
     const j = firstJson(text, '{', '}');
