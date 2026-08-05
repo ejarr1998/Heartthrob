@@ -478,7 +478,7 @@ exports.rpStart = onCall({ region: 'us-central1', timeoutSeconds: 180 }, async (
       `Invent tonight's woman. Return JSON with EXACTLY these keys:\n` +
       `"name": a sexy, memorable first name.\n` +
       `"persona": one vivid sentence — who she is and her vibe (e.g. "bored trophy wife at the hotel bar", "tattooed bartender with a filthy mouth"). Be specific and varied.\n` +
-      `"reply": her opening line TO the player — 1-3 sentences, first person, seductive and forward, talks directly to "you". R-rated.\n` +
+      `"reply": her opening line TO the player — 3-5 sentences (60-90 words), first person, seductive and forward, talks directly to "you". Paint a little scene, tease what's possible tonight. R-rated.\n` +
       `"photoPrompt": photorealistic image prompt of her matching the persona: mid-20s, describe hair/body/outfit (revealing — lingerie, tight dress, bikini — but NOT nude), pose, setting, lighting. Start with "Photorealistic photo of a woman". No text, no watermark.`,
       600);
     const j = firstJson(text, '{', '}');
@@ -512,7 +512,7 @@ exports.rpTurn = onCall({ region: 'us-central1', timeoutSeconds: 180 }, async (r
       `You are ${name}: ${persona}. You are in an ` + RP_TONE + 'Return ONLY JSON — no markdown.',
       hist + `He just said: "${him}".\n` +
       `Return JSON with EXACTLY these keys:\n` +
-      `"reply": 1-3 sentences, first person — react to EXACTLY what he said and escalate. Reference his words specifically. R-rated.\n` +
+      `"reply": 3-5 sentences (60-90 words), first person — react to what he said and ESCALATE: take it somewhere new, describe what you're doing or what you want. Do NOT repeat, quote, or paraphrase his words back to him — he knows what he said. R-rated.\n` +
       `"photoPrompt": photorealistic image prompt for a NEW photo of you reflecting what he just said — same woman as your persona (repeat her hair/look so she stays recognizable), new pose/outfit/setting inspired by his message, seductive, revealing but NOT nude. Start with "Photorealistic photo of a woman". No text, no watermark.`,
       600);
     const j = firstJson(text, '{', '}');

@@ -4168,19 +4168,24 @@ function renderSsWriteTV() {
       'roleplay/line': res.reply, 'roleplay/photo': res.photoUrl || '', 'roleplay/audioUrl': res.audioUrl || null,
       'roleplay/busy': false, state: 'rpShow' });
   }
-  const rpCard = (k, extra) => `<div class="ss-card" style="display:flex;align-items:stretch;width:min(1280px,94vw)">
-      <div class="ss-card-photo" style="width:min(470px,42vw);height:min(64vh,640px);flex:none">${k.photo ? mediaTag(k.photo) : ''}
-        <div class="ss-card-name">${esc(k.name || '???')}</div></div>
-      <div class="ss-card-body" style="flex:1;justify-content:center;gap:16px;padding:24px 28px">${extra}</div></div>`;
+  /* photo IS the star: full-bleed, whole image visible as large as the screen allows,
+     everything else floats in a slim gradient strip at the bottom */
+  const rpCard = (k, extra) => `<div style="position:fixed;left:0;right:0;top:76px;bottom:0;background:#050208;display:flex;align-items:center;justify-content:center;overflow:hidden">
+      ${k.photo ? `<img src="${esc(k.photo)}" style="width:100%;height:100%;object-fit:contain" alt="">` : ''}
+      <div style="position:absolute;left:0;right:0;bottom:0;padding:70px 5vw 26px;background:linear-gradient(transparent,rgba(4,2,10,.92) 42%);display:flex;flex-direction:column;gap:10px;align-items:center;text-align:center">
+        ${extra}
+      </div>
+      <div style="position:absolute;left:18px;bottom:14px;font-family:'Bungee';font-size:clamp(16px,1.8vw,26px);color:var(--rose);text-shadow:0 2px 10px rgba(0,0,0,.9)">${esc(k.name || '')}</div>
+    </div>`;
   function renderRpShowTV() {
     const k = room.roleplay;
     const hist = k.history || [];
     const lastHim = hist.length ? hist[hist.length - 1].him : '';
     stage().innerHTML = rpCard(k, `
-      <div class="ss-greet">“${esc(k.line || '…')}”</div>
-      ${lastHim ? `<div class="ss-roast">You said: “${esc(lastHim)}”</div>` : ''}
-      <div class="tv-sub" style="margin-top:6px">${k.busy ? "💭 She's thinking…" : '📱 Your move — talk to her from your phone'}</div>
-      <div style="margin-top:8px"><button class="btn ghost" id="rpEndBtn">🌙 End the night</button></div>`);
+      ${lastHim ? `<div style="font-weight:600;font-size:clamp(13px,1.3vw,18px);color:var(--muted)">You said: “${esc(lastHim)}”</div>` : ''}
+      <div class="ss-greet" style="font-size:clamp(20px,2.4vw,38px);max-width:1100px">“${esc(k.line || '…')}”</div>
+      <div class="tv-sub" style="margin-top:0">${k.busy ? "💭 She's thinking…" : '📱 Your move — talk to her from your phone'}</div>`);
+    stage().insertAdjacentHTML('beforeend', '<button class="btn ghost" id="rpEndBtn" style="position:fixed;top:86px;right:18px;z-index:5;opacity:.85">🌙 End the night</button>');
     $('#rpEndBtn').onclick = () => { SFX.play('thump'); R().update({ state: 'rpEnd' }); };
     if (once('rpA:' + k.turn)) prVoiceDone(k.audioUrl || null, k.line || null);
     if (!k.busy && k.him && once('rpT:' + k.turn)) doRpTurn();
@@ -4201,10 +4206,9 @@ function renderSsWriteTV() {
     const n = (k.history || []).length;
     if (once('snd:rpEnd')) SFX.play('gold');
     stage().innerHTML = rpCard(k, `
-      <div class="ss-greet">“${esc(k.line || '')}”</div>
+      <div class="ss-greet" style="font-size:clamp(20px,2.4vw,38px);max-width:1100px">“${esc(k.line || '')}”</div>
       <div class="tv-caption" style="font-size:clamp(22px,2.6vw,38px)">🌙 Night over</div>
-      <div class="tv-sub">${n} exchange${n === 1 ? '' : 's'} — she'll remember you.</div>
-      <div style="margin-top:14px"><button class="btn ghost" id="rpAgainBtn">🔁 New game</button></div>`);
+      <div class="tv-sub">${n} exchange${n === 1 ? '' : 's'} — she'll remember you. <button class="btn ghost" id="rpAgainBtn" style="margin-left:12px">🔁 New game</button></div>`);
     $('#rpAgainBtn').onclick = async () => { await db.ref('rooms/' + code).remove(); sessionStorage.removeItem('ht_tv'); location.reload(); };
   }
 
