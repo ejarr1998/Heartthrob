@@ -3280,17 +3280,27 @@ const TV = (() => {
 
   async function startShoot() {
     const ps = players(), ids = ps.map(([pid]) => pid);
-    const libS = await db.ref('library').once('value');
-    const urls = shuffle(Object.values(libS.val() || {}).map(i => i.url));
-    if (urls.length < SS_ROUNDS) { toast(`Shoot Your Shot needs at least ${SS_ROUNDS} photos in the library.`); const b = $('#ssBtn'); if (b) b.disabled = false; return; }
     R().update({ state: 'ssIntro', mode: 'shoot' });   // leave the lobby NOW — profiles generate behind the intro
     playStartFx(Math.random() < .5 ? 'vo_start_1' : 'vo_start_2');
-    // profiles: one AI call covers the whole game; mock bank if the function isn't live yet
+    // profiles: one AI call covers the whole game AND their portraits; mock bank if no function is live
     let profs = null;
-    const out = await aiCall('ssProfiles', { count: SS_ROUNDS }, 15000);
+    const out = await aiCall('ssProfiles', { count: SS_ROUNDS }, 45000);   // portraits take longer than text
     if (out && out.profiles && out.profiles.length >= SS_ROUNDS) profs = out.profiles.slice(0, SS_ROUNDS);
     else profs = shuffle(SS_MOCK_PROFILES).slice(0, SS_ROUNDS);
-    profs = profs.map((pr, i) => ({ ...pr, photo: urls[i] }));
+    // library photos only fill the gaps (mock profiles or a failed portrait)
+    const need = profs.filter(pr => !pr.photo).length;
+    let urls = [];
+    if (need) {
+      const libS = await db.ref('library').once('value');
+      urls = shuffle(Object.values(libS.val() || {}).map(i => i.url));
+      if (urls.length < need) {
+        toast(`Need ${need} photo${need > 1 ? 's' : ''} in the library (or live AI portraits) — back to the lobby.`);
+        R().update({ state: 'lobby' });
+        const b = $('#ssBtn'); if (b) b.disabled = false;
+        return;
+      }
+    }
+    profs = profs.map(pr => pr.photo ? pr : { ...pr, photo: urls.pop() });
     const scores = {}; ids.forEach(pid => scores[pid] = 0);
     R().update({
       state: 'ssWrite', mode: 'shoot',
@@ -3837,7 +3847,7 @@ function renderSsWriteTV() {
     const girls = (room.dilemma || {}).girls || {}, entries = Object.entries(girls);
     let pick = gpid && girls[gpid] ? Object.assign({ pid: gpid }, girls[gpid]) : null;
     if (!pick && entries.length) { const e = shuffle(entries)[0]; pick = Object.assign({ pid: e[0] }, e[1]); }
-    if (!pick) pick = { pid: null, name: 'Jess', photo: (players()[0] || [null, {}])[1].avatar || '' };
+    if (!pick) pick = { pid: null, name: 'Jess', photo: '' };   // empty photo -> playDlDilemma paints her with AI
     R().update({ 'dilemma/girlPid': pick.pid, 'dilemma/name': pick.name, 'dilemma/photo': pick.photo, state: 'dlDilemma' });
   }
 
@@ -3848,8 +3858,16 @@ function renderSsWriteTV() {
     if (!dl) {
       stage().innerHTML = `${dtScoreStrip()}
         <div class="tv-caption">💬 ${esc(k.name)} is working up the nerve<span class="accent">…</span></div>
-        <div class="cap-stage">${dtGirlCard(k)}</div>`;
-      dl = await aiCall('dtDilemma', { name: k.name }, 20000);
+        <div class="cap-stage">${k.photo ? dtGirlCard(k) : ''}</div>
+        <div class="tv-sub">${k.photo ? '' : 'Painting her portrait<span class="dots"></span>'}</div>`;
+      const jobs = [aiCall('dtDilemma', { name: k.name }, 20000)];
+      if (!k.photo) jobs.push(aiCall('dtPortrait', { name: k.name }, 40000));
+      const [out, portrait] = await Promise.all(jobs);   // her face + her problem, same wait
+      if (!k.photo) {
+        k.photo = (portrait && portrait.photoUrl) || (players()[0] || [null, {}])[1].avatar || '';
+        if (k.photo) R().update({ 'dilemma/photo': k.photo });   // later rounds read her photo from the room, not this closure
+      }
+      dl = out;
       if (!dl || !dl.dilemma) dl = dtMockDilemma();
       await R().update({ 'dilemma/opening': dl, 'dilemma/situation': dl.dilemma });
     }

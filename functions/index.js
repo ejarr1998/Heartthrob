@@ -11,6 +11,9 @@ const { getStorage } = require('firebase-admin/storage');
 initializeApp();
 
 const ANTHROPIC_KEY = () => process.env.ANTHROPIC_KEY || '';
+const XAI_KEY = () => process.env.XAI_KEY || '';
+const XAI_MODEL = () => process.env.XAI_MODEL || 'grok-4';          // text (vision-capable)
+const XAI_IMAGE_MODEL = () => process.env.XAI_IMAGE_MODEL || 'grok-2-image';
 const ELEVENLABS_KEY = () => process.env.ELEVENLABS_KEY || '';
 const ELEVENLABS_VOICE = () => process.env.ELEVENLABS_VOICE || 'EXAVITQu4vr4xnSDxMaL';   // "Sarah"
 const CLAUDE_MODEL = 'claude-sonnet-5';
@@ -33,6 +36,62 @@ async function claude(system, user, maxTokens) {
   if (!r.ok) throw new Error('anthropic ' + r.status + ': ' + (await r.text()).slice(0, 200));
   const j = await r.json();
   return (j.content || []).map(b => b.text || '').join('');
+}
+
+/* Grok (xAI) — OpenAI-compatible. `user` accepts a plain string OR the same
+   content-blocks array shape we pass to Claude; image blocks are converted to
+   OpenAI image_url parts with data URIs. */
+async function xaiChat(system, user, maxTokens) {
+  const toParts = u => (Array.isArray(u) ? u : [{ type: 'text', text: u }]).map(b =>
+    b.type === 'image'
+      ? { type: 'image_url', image_url: { url: `data:${b.source.media_type};base64,${b.source.data}` } }
+      : { type: 'text', text: b.text });
+  const r = await fetch('https://api.x.ai/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'authorization': 'Bearer ' + XAI_KEY() },
+    body: JSON.stringify({
+      model: XAI_MODEL(),
+      max_tokens: maxTokens || 600,
+      temperature: 0.95,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: toParts(user) }
+      ]
+    })
+  });
+  if (!r.ok) throw new Error('xai ' + r.status + ': ' + (await r.text()).slice(0, 200));
+  const j = await r.json();
+  return (((j.choices || [])[0] || {}).message || {}).content || '';
+}
+
+/* Grok first, Claude as the safety net — a bad Grok call never wedges a game. */
+async function chat(system, user, maxTokens) {
+  if (XAI_KEY()) {
+    try { return await xaiChat(system, user, maxTokens); }
+    catch (e) {
+      console.error('grok failed, falling back to claude:', e.message);
+      if (!ANTHROPIC_KEY()) throw e;
+    }
+  }
+  return claude(system, user, maxTokens);
+}
+
+/* Photoreal portrait via Grok image gen -> public Storage URL (same pattern as tts). */
+async function xaiImage(prompt) {
+  const r = await fetch('https://api.x.ai/v1/images/generations', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'authorization': 'Bearer ' + XAI_KEY() },
+    body: JSON.stringify({ model: XAI_IMAGE_MODEL(), prompt, n: 1, response_format: 'b64_json' })
+  });
+  if (!r.ok) throw new Error('xai image ' + r.status + ': ' + (await r.text()).slice(0, 200));
+  const j = await r.json();
+  const b64 = (((j.data || [])[0] || {}).b64_json) || '';
+  if (!b64) throw new Error('xai image: empty response');
+  const buf = Buffer.from(b64, 'base64');
+  const path = `girls/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.jpg`;
+  const bucket = getStorage().bucket();
+  await bucket.file(path).save(buf, { contentType: 'image/jpeg', public: true });
+  return `https://storage.googleapis.com/${bucket.name}/${path}`;
 }
 
 const firstJson = (text, open, close) => {
@@ -64,7 +123,14 @@ exports.ssProfiles = onCall({ region: 'us-central1', timeoutSeconds: 40 }, async
   if (!ANTHROPIC_KEY()) return { profiles: null, demo: true };
   try {
     const count = Math.min(8, Math.max(3, (req.data || {}).count || 5));
-    const text = await claude(
+    // deterministic variety: WE assign the jobs, the model just writes around them
+    const JOBS = ['ER Nurse', 'Law Student', 'Bartender', 'Dental Hygienist', 'Tattoo Artist', 'Personal Trainer',
+      'Flight Attendant', 'Software Dev', 'Real Estate Agent', 'Hair Stylist', 'Paramedic', 'Third-Grade Teacher',
+      'Vet Tech', 'Accountant', 'Line Cook', 'Pharmacy Tech', 'Army Reservist', 'Wedding Photographer',
+      'Barista', 'Physical Therapist', 'Police Officer', 'Social Media Manager', 'Electrician', 'Med Student',
+      'Yoga Instructor', 'Mortgage Broker', 'EMT', 'Makeup Artist', 'Sales Rep', 'Nursing Student'];
+    const jobs = JOBS.sort(() => Math.random() - .5).slice(0, count);
+    const text = await chat(
       'You write dating profiles for a college party game played by 4-6 guys in their 20s. ' +
       'Profiles are flirty, witty, savage but not cruel, strictly PG-13. Vary the archetypes ' +
       '(gym girl, nurse, lawyer, party girl, teacher, influencer, barista, film snob…). ' +
@@ -76,10 +142,24 @@ exports.ssProfiles = onCall({ region: 'us-central1', timeoutSeconds: 40 }, async
       `"education" (short — e.g. "ASU", "Community College", "Trade School", "U of A"), ` +
       `"height" (written like 5\'4"), "location" (a neighborhood or area — e.g. "Old Town", "Downtown"), ` +
       `"prompts" (array of EXACTLY 2 objects {"label", "answer"} — label MUST be picked from this list: "My simple pleasures", "I want someone who", "Together, we could", "I'm known for", "Don't hate me if I", "The way to win me over", "Green flags I look for"; answer is 4-14 words, first person, specific, playful, sounds like a real 24-year-old wrote it, no cliches), ` +
-      `"greeting" (one flirty, challenging sentence she says to the players, max 15 words).`,
+      `"greeting" (one flirty, challenging sentence she says to the players, max 15 words).
+` +
+      `Assign the jobs in EXACTLY this order, one per profile: ${jobs.join(', ')}.`,
       1400);
-    const arr = firstJson(text, '[', ']');
-    return { profiles: arr.slice(0, count) };
+    const arr = firstJson(text, '[', ']').slice(0, count);
+    arr.forEach((pr, i) => { pr.job = jobs[i]; });   // hard-enforce, model drift or not
+    // AI portraits in parallel — the library becomes optional
+    if (XAI_KEY()) {
+      await Promise.all(arr.map(async pr => {
+        try {
+          pr.photo = await xaiImage(
+            `Casual candid photo of a ${pr.age || 24}-year-old American woman for a dating app profile, ` +
+            `she works as a ${pr.job}. Photorealistic, shot on a phone, natural light, relaxed smile, ` +
+            `waist-up, everyday setting (coffee shop, park, apartment), no text, no watermark.`);
+        } catch (e) { console.error('portrait failed for ' + pr.name, e.message); }
+      }));
+    }
+    return { profiles: arr };
   } catch (e) {
     console.error('ssProfiles failed', e);
     return { profiles: null, demo: true };
@@ -89,7 +169,7 @@ exports.ssProfiles = onCall({ region: 'us-central1', timeoutSeconds: 40 }, async
 /* ---- she reads every line, picks a winner, roasts the worst ---- */
 exports.ssJudge = onCall({ region: 'us-central1', timeoutSeconds: 60 }, async (req) => {
   const d = req.data || {};
-  if (!ANTHROPIC_KEY() || !Array.isArray(d.lines) || !d.lines.length) return { demo: true };
+  if ((!ANTHROPIC_KEY() && !XAI_KEY()) || !Array.isArray(d.lines) || !d.lines.length) return { demo: true };
   const RULES = {
     standard: 'Judge normally: reward charm, wit, and specificity to her profile.',
     redflag: 'Her profile has red flags. Reward lines that cleverly address them or weaponize them.',
@@ -118,7 +198,7 @@ exports.ssJudge = onCall({ region: 'us-central1', timeoutSeconds: 60 }, async (r
       '"roast": one savage sentence about why that line failed, address them by first name,\n' +
       '"verdicts": object mapping EVERY non-winner pid to a 1-3 word verdict stamp (e.g. "desperate", "smooth", "restraining order", "too safe"),\n' +
       '"crowdDisagree": one savage sentence defending your pick if the whole room boos it — dismiss them all.' });
-    const text = await claude(
+    const text = await chat(
       `You are ${p.name}, ${p.age}, ${p.job} from ${p.location}. ` +
       (p.prompts || []).map(pr => `On your dating profile, under "${pr.label}", you wrote: "${pr.answer}". `).join('') +
       hist +
@@ -155,7 +235,7 @@ exports.ssJudge = onCall({ region: 'us-central1', timeoutSeconds: 60 }, async (r
 /* ---- Profile Review: a panel of three AI girls swipes on the guys' own profiles ---- */
 exports.prJudge = onCall({ region: 'us-central1', timeoutSeconds: 60 }, async (req) => {
   const d = req.data || {};
-  if (!ANTHROPIC_KEY()) return { demo: true };
+  if (!ANTHROPIC_KEY() && !XAI_KEY()) return { demo: true };
   try {
     const name = d.name || 'this guy';
     const blocks = [{ type: 'text', text:
@@ -170,7 +250,7 @@ exports.prJudge = onCall({ region: 'us-central1', timeoutSeconds: 60 }, async (r
       '\nReturn JSON with EXACTLY these keys: "romantic", "savage", "unhinged" — each an object ' +
       '{"swipe": "left" or "right", "comment": your spoken verdict, 1-2 sentences}. ' +
       'Each comment MUST reference something SPECIFIC you see in his photos or answers. Address him by first name sometimes.' });
-    const text = await claude(
+    const text = await chat(
       'You are THREE women on a party dating-profile review panel, judging one guy out loud while he squirms. ' +
       'ROMANTIC: hopeless romantic, generous, wants love to win — swipes right unless truly hopeless. ' +
       'SAVAGE: brutally honest with high standards — harsh on weak profiles but genuinely won over by good ones; a strong profile earns her right swipe roughly half the time. ' +
@@ -204,14 +284,14 @@ exports.prJudge = onCall({ region: 'us-central1', timeoutSeconds: 60 }, async (r
 /* ---- Profile Review finale: the panel argues it out and crowns a champion ---- */
 exports.prDeliberate = onCall({ region: 'us-central1', timeoutSeconds: 60 }, async (req) => {
   const d = req.data || {};
-  if (!ANTHROPIC_KEY() || !Array.isArray(d.contenders)) return { demo: true };
+  if ((!ANTHROPIC_KEY() && !XAI_KEY()) || !Array.isArray(d.contenders)) return { demo: true };
   try {
     const sheet = d.contenders.map(c =>
       `- pid "${c.pid}" (${c.name}): ${c.rights}/3 right swipes. Prompts: ${(c.prompts || []).map(pr => `"${pr.label}" -> "${pr.answer}"`).join('; ')}.` +
       (c.bio ? ` Bio: "${c.bio}".` : '') +
       ` Panel said — Romantic: "${(c.comments || {}).romantic || ''}", Savage: "${(c.comments || {}).savage || ''}", Unhinged: "${(c.comments || {}).unhinged || ''}"`
     ).join('\n');
-    const text = await claude(
+    const text = await chat(
       'You are the SAME three women from the review panel (ROMANTIC, SAVAGE, UNHINGED), now arguing amongst yourselves to crown one champion of the night. ' +
       'You bicker, interrupt, reference your own earlier verdicts and specific profile details, then agree on ONE winner. ' +
       'Debate lines are 1-2 sentences each, strictly PG-13, in character. Return ONLY JSON — no markdown.',
@@ -255,10 +335,10 @@ exports.prDeliberate = onCall({ region: 'us-central1', timeoutSeconds: 60 }, asy
    dtEpilogue — "one month later" wrap-up judging the whole room's advice (voiced). */
 exports.dtDilemma = onCall({ region: 'us-central1', timeoutSeconds: 40 }, async (req) => {
   const d = req.data || {};
-  if (!ANTHROPIC_KEY()) return { demo: true };
+  if (!ANTHROPIC_KEY() && !XAI_KEY()) return { demo: true };
   try {
     const name = String(d.name || 'Jess').slice(0, 24);
-    const text = await claude(
+    const text = await chat(
       `You are ${name}, a woman in her early-mid 20s at a party, asking a group of guys for advice about your messy life. ` +
       'You speak first person, casual, funny, a little chaotic, strictly PG-13. ' +
       'Your situation should be specific and entertaining — situationships, roommates, coworkers, exes, family, money, social media drama. ' +
@@ -281,7 +361,7 @@ exports.dtDilemma = onCall({ region: 'us-central1', timeoutSeconds: 40 }, async 
 
 exports.dtOutcome = onCall({ region: 'us-central1', timeoutSeconds: 60 }, async (req) => {
   const d = req.data || {};
-  if (!ANTHROPIC_KEY()) return { demo: true };
+  if (!ANTHROPIC_KEY() && !XAI_KEY()) return { demo: true };
   try {
     const name = String(d.name || 'Jess').slice(0, 24);
     const goneWrong = !!d.goneWrong;
@@ -289,7 +369,7 @@ exports.dtOutcome = onCall({ region: 'us-central1', timeoutSeconds: 60 }, async 
     const hist = Array.isArray(d.history) && d.history.length
       ? 'So far this week: ' + d.history.map(h => `When "${h.situation}" the group told you to "${h.advice}" and then ${h.outcome}`).join(' / ') + '. '
       : '';
-    const text = await claude(
+    const text = await chat(
       `You are ${name}, a woman in her 20s updating a group of guys at a party who have been giving you life advice all night. ` +
       'First person, casual, funny, dramatic, strictly PG-13. Return ONLY JSON — no markdown.',
       hist +
@@ -324,14 +404,14 @@ exports.dtOutcome = onCall({ region: 'us-central1', timeoutSeconds: 60 }, async 
 
 exports.dtEpilogue = onCall({ region: 'us-central1', timeoutSeconds: 60 }, async (req) => {
   const d = req.data || {};
-  if (!ANTHROPIC_KEY()) return { demo: true };
+  if (!ANTHROPIC_KEY() && !XAI_KEY()) return { demo: true };
   try {
     const name = String(d.name || 'Jess').slice(0, 24);
     const hist = Array.isArray(d.history) ? d.history : [];
     const recap = hist.map(h =>
       `- ${h.adviceBy} told her to "${h.advice}" -> ${h.goneWrong ? 'DISASTER' : 'it worked'}: ${h.outcome}`
     ).join('\n');
-    const text = await claude(
+    const text = await chat(
       `You are ${name}, a woman in her 20s. A group of guys at a party spent the night giving you advice. ` +
       'First person, funny, warm but honest, strictly PG-13. Return ONLY JSON — no markdown.',
       'Everything that happened this week thanks to their advice:\n' + recap + '\n\n' +
@@ -349,6 +429,22 @@ exports.dtEpilogue = onCall({ region: 'us-central1', timeoutSeconds: 60 }, async
     return { epilogue: j.epilogue || null, shoutout: j.shoutout || null, audioUrl };
   } catch (e) {
     console.error('dtEpilogue failed', e);
+    return { demo: true };
+  }
+});
+
+/* ---- Girl Talk: generate "the girl" when the room has no photo for her ---- */
+exports.dtPortrait = onCall({ region: 'us-central1', timeoutSeconds: 60 }, async (req) => {
+  const d = req.data || {};
+  if (!XAI_KEY()) return { demo: true };
+  try {
+    const name = String(d.name || 'Jess').slice(0, 24);
+    const photoUrl = await xaiImage(
+      `Casual candid photo of a 24-year-old American woman named ${name} for a party game, ` +
+      'photorealistic, shot on a phone at a house party, warm indoor light, mid-laugh, waist-up, no text, no watermark.');
+    return { photoUrl };
+  } catch (e) {
+    console.error('dtPortrait failed', e);
     return { demo: true };
   }
 });
