@@ -1650,8 +1650,6 @@ const Studio = (() => {
    TV — game master, drives all state transitions
 ================================================================ */
 // shared: Hinge prompt labels for Profile Review (TV + phone both use these)
-const SG_SECTIONS = ['Verse 1', 'Chorus', 'Verse 2', 'Bridge'];
-const SG_HINTS = ['set the scene — 2-4 lines', 'the hook — big, dumb, catchy, 2-3 lines', 'the story continues — 2-4 lines', 'the emotional twist — 2-3 lines'];
 const PR_PROMPTS = ['My simple pleasures', 'I want someone who', 'Together, we could', "I'm known for", "Don't hate me if I", 'The way to win me over', 'Green flags I look for'];
 
 const TV = (() => {
@@ -1818,16 +1816,6 @@ const TV = (() => {
     } else if (st === 'dlVote') {
       const k3 = room.dilemma || {}, missing = players().filter(([pid]) => (k3.votes || {})[pid] == null);
       armIdle('dlV:' + k3.round, missing.length > 0, missing.length === 1 ? missing[0][0] : null);
-    } else if (st === 'sgTheme') {
-      const missing = players().filter(([pid]) => !((room.song || {}).themes || {})[pid]);
-      armIdle('sgTheme', missing.length > 0, missing.length === 1 ? missing[0][0] : null);
-    } else if (st === 'sgWrite') {
-      const k4 = room.song || {};
-      const emptyOwners = [...new Set(SG_SECTIONS.map((l, s) => s).filter(s => !sgText(k4, s)).map(s => (k4.assign || {})[s]))].filter(Boolean);
-      armIdle('sgWrite', emptyOwners.length > 0, emptyOwners.length === 1 ? emptyOwners[0] : null, 52000);
-    } else if (st === 'sgVote') {
-      const missing = players().filter(([pid]) => ((room.song || {}).votes || {})[pid] == null);
-      armIdle('sgVote', missing.length > 0, missing.length === 1 ? missing[0][0] : null);
     } else armIdle('none', false);
     // sudden-death heartbeat: only while a rematch duel is being picked
     const wantHB = st === 'sdDuel' && room.showdown && room.showdown.duel && room.showdown.duel.rematch;
@@ -1865,11 +1853,6 @@ const TV = (() => {
     else if (st === 'dlVote') renderDlVoteTV();
     else if (st === 'dlOutcome') { if (once('dlOutcome:' + room.dilemma.round)) playDlOutcome(); }
     else if (st === 'dlFinal') { if (once('dlFinal')) playDlFinal(); }
-    else if (st === 'sgTheme') renderSgThemeTV();
-    else if (st === 'sgWrite') renderSgWriteTV();
-    else if (st === 'sgPerform') { if (once('sgPerform')) playSgPerform(); }
-    else if (st === 'sgVote') renderSgVoteTV();
-    else if (st === 'sgFinal') { if (once('sgFinal')) renderSgFinal(); }
     else if (st === 'ssIntro') renderSsIntroTV();
     else if (st === 'ssWrite') renderSsWriteTV();
     else if (st === 'ssJudge') { if (once('ssJudge:' + room.shoot.round)) playSsJudge(); }
@@ -1905,7 +1888,6 @@ const TV = (() => {
         <button class="btn big" id="ssBtn" ${ps.length < 2 ? 'disabled' : ''}>😏 Shoot Your Shot ▶</button>
         <button class="btn big" id="prBtn" ${ps.length < 2 ? 'disabled' : ''}>😈 Profile Review ▶</button>
         <button class="btn big teal" id="dtBtn" ${ps.length < 2 ? 'disabled' : ''}>💬 Girl Talk ▶</button>
-        <button class="btn big gold" id="sgBtn" ${ps.length < 2 ? 'disabled' : ''}>🎵 One-Hit Wonder ▶</button>
       </div>
       <div class="tv-sub">${ps.length < 2 ? 'Need at least 2 players' : ps.length > 6 ? 'Max 6 players!' : ps.length + ' player' + (ps.length > 1 ? 's' : '') + ' ready' + (ps.length < 3 ? ' · Showdown & Contest need 3+' : '')}</div>`;
     if (window.QRCode) new QRCode($('#lobbyQR'), { text: location.origin + location.pathname, width: 150, height: 150, correctLevel: QRCode.CorrectLevel.M });
@@ -1942,9 +1924,6 @@ const TV = (() => {
     const dtb = s.querySelector('#dtBtn');
     if (ps.length > 6) dtb.disabled = true;
     dtb.onclick = () => { dtb.disabled = true; startDilemma(); };
-    const sgb = s.querySelector('#sgBtn');
-    if (ps.length > 6) sgb.disabled = true;
-    sgb.onclick = () => { sgb.disabled = true; startSong(); };
   }
 
   /* ---------- arrow-through-heart start FX ---------- */
@@ -4124,227 +4103,6 @@ function renderSsWriteTV() {
     $('#dlAgainBtn').onclick = async () => { await db.ref('rooms/' + code).remove(); sessionStorage.removeItem('ht_tv'); location.reload(); };
   }
 
-  /* ================= ONE-HIT WONDER (mode: song) =================
-     The room writes a song together. Theme pitched on phones, host picks on
-     TV -> Verse 1 / Chorus / Verse 2 / Bridge dealt round-robin -> phones type
-     LIVE onto the TV lyric sheet (no submit button, drafts ARE the song) ->
-     ElevenLabs Music sings it (karaoke highlight), with a spoken-word voice
-     fallback -> best-section vote -> podium. */
-  const SG_THEME_MS = 45000, SG_WRITE_MS = 90000, SG_VOTE_MS = 30000;
-  let sgVoteKey = '';
-
-  const sgScoreStrip = () => {
-    const k = room.song, ps = players();
-    const max = Math.max(...ps.map(([pid]) => (k.scores || {})[pid] || 0));
-    return `<div class="score-strip">` + ps.map(([pid, p]) => {
-      const sc = (k.scores || {})[pid] || 0;
-      return `<div class="score-chip${sc === max && max > 0 ? ' lead' : ''}">${pav(p.avatar)}${esc(p.name)} · ${sc}</div>`;
-    }).join('') + `</div>`;
-  };
-  const sgOwner = (k, s) => room.players[(k.assign || {})[s]] || {};
-  const sgText = (k, s) => {
-    const o = (k.assign || {})[s];
-    return o ? (((k.drafts || {})[o] || {})[s] || '') : '';
-  };
-
-  async function startSong() {
-    const ps = players(), scores = {};
-    ps.forEach(([pid]) => scores[pid] = 0);
-    playStartFx(Math.random() < .5 ? 'vo_start_1' : 'vo_start_2');
-    R().update({ state: 'sgTheme', mode: 'song',
-      song: { themes: null, theme: null, assign: null, drafts: null, perf: null, votes: null, tally: null, scores } });
-  }
-
-  /* ---- pitch: what is our song about? host taps the winner ---- */
-  function renderSgThemeTV() {
-    const k = room.song, ps = players(), themes = Object.entries(k.themes || {});
-    if (once('snd:sgT')) { SFX.play('whoosh'); armCcTimer(SG_THEME_MS, 'sgTheme', () => once('sgTTO') && sgThemeDone(null)); }
-    stage().innerHTML = `
-      ${sgScoreStrip()}
-      <div class="tv-caption">🎵 One-Hit Wonder<span class="accent">!</span></div>
-      <div class="cap-timer" id="ccTimer"></div>
-      <div class="tv-sub" style="max-width:min(980px,86vw);font-size:clamp(16px,1.8vw,24px)">We're writing a song together — and the AI will <b>sing</b> it at the end.<br>Phones: pitch what our song is about. Host: tap the winner.</div>
-      <div class="waiting-avatars" style="margin:12px 0">${ps.map(([pid, p]) => `<div class="wa${(k.themes || {})[pid] ? ' done' : ''}"><img src="${p.avatar}" alt=""></div>`).join('')}</div>
-      <div id="sgThemes" style="display:flex;gap:14px;flex-wrap:wrap;justify-content:center;max-width:min(1200px,92vw)"></div>`;
-    const box = $('#sgThemes');
-    themes.forEach(([tpid, t]) => {
-      const c = el('div', 'ss-oth', `“${esc(t)}”`);
-      c.style.cssText += ';cursor:pointer;animation:popIn .3s both';
-      c.onclick = () => { clearCcTimer(); SFX.play('gold'); sgThemeDone(t); };
-      box.appendChild(c);
-    });
-    if (ps.every(([pid]) => (k.themes || {})[pid]) && themes.length === 1 && once('sgSolo')) { clearCcTimer(); sgThemeDone(themes[0][1]); }
-  }
-
-  function sgThemeDone(pick) {
-    const themes = Object.values((room.song || {}).themes || {});
-    const theme = pick || shuffle(themes)[0] || 'love, regret, and someone stealing the aux cord at this party';
-    const order = shuffle(players().map(([pid]) => pid));
-    const assign = {};
-    SG_SECTIONS.forEach((lbl, s) => { assign[s] = order[s % order.length]; });   // 2 players -> 2 sections each
-    R().update({ 'song/theme': theme, 'song/assign': assign, state: 'sgWrite' });
-  }
-
-  /* ---- the live lyric sheet: phones type, TV fills in real-time ---- */
-  function renderSgWriteTV() {
-    const k = room.song;
-    if (once('snd:sgW')) {
-      SFX.play('whoosh');
-      VOICE.say(VOICE.pickFresh(['vo_round_1', 'vo_round_2', 'vo_round_3']));
-      armCcTimer(SG_WRITE_MS, 'sgWrite', () => once('sgWTO') && sgWriteDone());
-      stage().innerHTML = `
-        ${sgScoreStrip()}
-        <div class="tv-caption">🎵 Write your section<span class="accent">!</span></div>
-        <div class="tv-sub" style="margin-top:-4px">Our song is about: <b style="color:var(--cream)">“${esc(k.theme)}”</b> — you are typing LIVE on this screen 👀</div>
-        <div class="cap-timer" id="ccTimer"></div>
-        <div id="sgSheet" style="display:flex;flex-direction:column;gap:10px;width:min(1100px,90vw)">
-          ${SG_SECTIONS.map((lbl, s) => `
-            <div class="pr-verdict" style="text-align:left;padding:10px 16px">
-              <div class="pr-persona">${lbl} — <b id="sgWho${s}"></b></div>
-              <div class="pr-comment" id="sgSec${s}" style="white-space:pre-wrap;color:var(--muted);font-size:clamp(14px,1.5vw,22px)">…</div>
-            </div>`).join('')}
-        </div>
-        <div class="tv-sub" style="margin-top:10px"><button class="btn gold" id="sgWrap">That's a wrap — cut the record ▶</button></div>`;
-      $('#sgWrap').onclick = () => { clearCcTimer(); SFX.play('gold'); sgWriteDone(); };
-    }
-    for (let s = 0; s < SG_SECTIONS.length; s++) {   // text-only updates — never clobber the sheet
-      const who = $('#sgWho' + s);
-      if (who) who.textContent = sgOwner(k, s).name || '???';
-      const box = $('#sgSec' + s);
-      if (!box) continue;
-      const txt = sgText(k, s);
-      box.textContent = txt || '…';
-      box.style.color = txt ? 'var(--cream)' : 'var(--muted)';
-    }
-  }
-
-  function sgWriteDone() { R().update({ state: 'sgPerform' }); }
-
-  /* ---- the performance: sung by ElevenLabs Music, karaoke highlight ---- */
-  async function playSgPerform() {
-    const k = room.song;
-    let perf = k.perf;
-    if (!perf) {
-      stage().innerHTML = `${sgScoreStrip()}
-        <div class="tv-caption">🎵 Cutting the record<span class="accent">…</span></div>
-        <div class="tv-sub">“${esc(k.theme)}” — the studio is working<span class="dots"></span></div>`;
-      const sections = SG_SECTIONS.map((lbl, s) => ({ label: lbl, text: sgText(k, s) || '(instrumental break)' }));
-      const out = await aiCall('sgPerform', { theme: k.theme, sections }, 120000);
-      perf = { title: (out && out.title) || String(k.theme || 'The Ballad').slice(0, 40), audioUrl: (out && out.audioUrl) || null };
-      await R().update({ 'song/perf': perf });
-    }
-    const order = [0, 1, 2, 1, 3, 1];   // V1 C V2 C B C — the chorus always comes back
-    stage().innerHTML = `
-      ${sgScoreStrip()}
-      <div class="tv-caption">🎵 “${esc(perf.title)}”<span class="accent">!</span></div>
-      <div class="tv-sub" style="margin-top:-4px">a song about ${esc(k.theme)}</div>
-      <div id="sgStage" style="display:flex;flex-direction:column;gap:10px;width:min(1000px,88vw);max-height:58vh;overflow-y:auto;padding:4px">
-        ${order.map((s, i) => `
-          <div class="pr-verdict" id="sgLine${i}" style="text-align:left;opacity:.4;transition:opacity .4s,border-color .4s">
-            <div class="pr-persona">${SG_SECTIONS[s]}${s === 1 && i > 1 ? ' 🔁' : ''} — <b>${esc(sgOwner(k, s).name || '???')}</b></div>
-            <div class="pr-comment" style="white-space:pre-wrap">${esc(sgText(k, s) || '(instrumental break 🎸)')}</div>
-          </div>`).join('')}
-      </div>`;
-    const highlight = i => {
-      const row = $('#sgLine' + i);
-      if (!row) return;
-      row.style.opacity = '1';
-      row.style.borderColor = 'var(--gold)';
-      row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-    };
-    if (perf.audioUrl) {
-      let dur = 0;
-      try {   // time the karaoke highlight off the actual track length
-        const probe = new Audio(); probe.preload = 'metadata'; probe.src = perf.audioUrl;
-        await new Promise(r => { probe.onloadedmetadata = r; probe.onerror = r; setTimeout(r, 6000); });
-        if (probe.duration && isFinite(probe.duration)) dur = probe.duration;
-      } catch (e) {}
-      const seg = (dur || order.length * 12) * 1000 / order.length;
-      const playing = prVoiceDone(perf.audioUrl, null);
-      for (let i = 0; i < order.length; i++) {
-        if (room.state !== 'sgPerform') return;
-        highlight(i);
-        await sleep(seg);
-      }
-      await playing;
-    } else {   // no music API -> the girl voice performs it spoken-word, section by section
-      for (let i = 0; i < order.length; i++) {
-        if (room.state !== 'sgPerform') return;
-        highlight(i);
-        await prVoiceDone(null, sgText(k, order[i]) || 'instrumental break');
-      }
-    }
-    await sleep(600);
-    if (room.state !== 'sgPerform') return;
-    const nextBtn = el('button', 'btn big gold', 'The awards ▶');
-    nextBtn.style.cssText = 'margin-top:18px;font-size:clamp(18px,1.8vw,26px)';
-    stage().appendChild(nextBtn);
-    nextBtn.onclick = () => { nextBtn.disabled = true; SFX.play('whoosh'); R().update({ state: 'sgVote' }); };
-  }
-
-  /* ---- best-section vote ---- */
-  function renderSgVoteTV() {
-    const k = room.song, votes = k.votes || {};
-    if (sgVoteKey !== 'sgV') {
-      sgVoteKey = 'sgV';
-      if (once('snd:sgV')) { SFX.play('whoosh'); armCcTimer(SG_VOTE_MS, 'sgVote', () => once('sgVTO') && sgResolveVotes()); }
-      stage().innerHTML = `
-        ${sgScoreStrip()}
-        <div class="tv-caption">🎵 Best section<span class="accent">?</span></div>
-        <div class="cap-timer" id="ccTimer"></div>
-        <div class="cap-write-grid" style="max-width:min(1400px,94vw)">
-          ${SG_SECTIONS.map((lbl, s) => `
-            <div class="pr-verdict" style="text-align:left">
-              <div class="pr-persona">${lbl}</div>
-              <div class="pr-comment" style="white-space:pre-wrap;font-size:clamp(14px,1.4vw,20px)">${esc(sgText(k, s) || '(instrumental break 🎸)')}</div>
-            </div>`).join('')}
-        </div>
-        <div class="tv-sub">Phones: vote for the best section — not your own 👀</div>
-        <div class="waiting-avatars" id="sgVoters" style="margin-top:10px"></div>`;
-    }
-    const voters = $('#sgVoters');
-    if (voters) voters.innerHTML = players().map(([pid, p]) => `<div class="wa${votes[pid] != null ? ' done' : ''}"><img src="${p.avatar}" alt=""></div>`).join('');
-    if (players().every(([pid]) => votes[pid] != null) && once('sgVotesIn')) { clearCcTimer(); sgResolveVotes(); }
-  }
-
-  function sgResolveVotes() {
-    const k = room.song, tally = {};
-    Object.values(k.votes || {}).forEach(s => { tally[s] = (tally[s] || 0) + 1; });
-    const u = { state: 'sgFinal', 'song/tally': tally };
-    Object.entries(tally).forEach(([s, n]) => {
-      const owner = (k.assign || {})[s];
-      if (owner) u[`song/scores/${owner}`] = ((k.scores || {})[owner] || 0) + n * 100;
-    });
-    R().update(u);
-  }
-
-  function renderSgFinal() {
-    const k = room.song, tally = k.tally || {};
-    const bestKeys = Object.keys(tally);
-    const best = bestKeys.length ? +bestKeys.sort((a, b) => (tally[b] || 0) - (tally[a] || 0))[0] : null;
-    const ranked = players().map(([pid, p]) => [pid, p, (k.scores || {})[pid] || 0]).sort((a, b) => b[2] - a[2]);
-    confettiBurst(140);
-    SFX.play('fanfare');
-    VOICE.say('vo_showcase');
-    const pods = ranked.map(([pid, p, sc], i) => `
-      <div class="sd-pod card${i === 0 ? ' first' : ''}" style="animation-delay:${i * .15}s">
-        ${i === 0 ? '<div class="crown">👑</div>' : ''}
-        ${pav(p.avatar)}<b>${esc(p.name)}</b><span class="pts">${sc} pt${sc === 1 ? '' : 's'}</span>
-      </div>`).join('');
-    stage().innerHTML = `
-      <div class="tv-caption">🎵 “${esc((k.perf || {}).title || k.theme)}”<span class="accent">!</span></div>
-      <div class="tv-sub">${best != null ? `🏆 Best section: <b>${SG_SECTIONS[best]}</b> by <b>${esc(sgOwner(k, best).name || '???')}</b>` : 'No votes — the critics are cowards'}</div>
-      <div class="tv-caption" style="font-size:clamp(22px,2.6vw,38px);margin-top:14px">👑 Songwriter of the Night</div>
-      <div class="sd-podium">${pods}</div>
-      <div class="tv-sub" style="margin-top:20px;display:flex;gap:14px;justify-content:center">
-        ${(k.perf || {}).audioUrl ? '<button class="btn teal" id="sgReplay">🔊 Play it again</button>' : ''}
-        <button class="btn ghost" id="sgAgainBtn">🔁 New game</button>
-      </div>`;
-    const rp = $('#sgReplay');
-    if (rp) rp.onclick = () => { SFX.play('gold'); prVoiceDone(k.perf.audioUrl, null); };
-    $('#sgAgainBtn').onclick = async () => { await db.ref('rooms/' + code).remove(); sessionStorage.removeItem('ht_tv'); location.reload(); };
-  }
-
   function renderSsFinal() {
     const k = room.shoot;
     const ranked = players().map(([pid, p]) => [pid, p, (k.scores || {})[pid] || 0]).sort((a, b) => b[2] - a[2]);
@@ -4475,7 +4233,7 @@ const Player = (() => {
       sd.duelIdx, d.rematch, !!(sd.kept && sd.kept[pid]), !!(d.cards && d.cards[pid]), d.votes && d.votes[pid] != null,
       (room.caption || {}).round, (room.caption || {}).matchupIdx, !!(room.caption || {}).finale, capSelfKey(),
       (room.contest || {}).round, ccSelfKey(), (room.shoot || {}).round, ssSelfKey(),
-      (room.review || {}).idx, prSelfKey(), (room.dilemma || {}).round, dtSelfKey(), sgSelfKey()].join('|');   // state covers prDebate/prFinal + dlDilemma/dlOutcome/dlFinal
+      (room.review || {}).idx, prSelfKey(), (room.dilemma || {}).round, dtSelfKey()].join('|');   // state covers prDebate/prFinal + dlDilemma/dlOutcome/dlFinal
     if (key === lastKey) return;
     lastKey = key;
     function prSelfKey() {
@@ -4510,14 +4268,6 @@ const Player = (() => {
     function ssSelfKey() {
       const k = room.shoot || {};
       if (room.state === 'ssWrite') return (k.lines || {})[pid] ? 1 : 0;
-      return 0;
-    }
-    // song-mode self status for the dedupe key (sgWrite intentionally returns ''
-    // — a re-render mid-typing would wipe the lyric box)
-    function sgSelfKey() {
-      const k = room.song || {};
-      if (room.state === 'sgTheme') return (k.themes || {})[pid] ? 1 : 0;
-      if (room.state === 'sgVote') return (k.votes || {})[pid] != null ? 1 : 0;
       return 0;
     }
     // girl-talk self status for the dedupe key
@@ -4561,11 +4311,6 @@ const Player = (() => {
     else if (st === 'dlVote') { dtFlushDraft(); renderDlVotePhone(); }
     else if (st === 'dlOutcome') { dtFlushDraft(); stage().innerHTML = waitingCard('🍿', 'She took the advice…', 'Watch the TV. This could get messy.'); }
     else if (st === 'dlFinal') renderDlFinalPhone();
-    else if (st === 'sgTheme') renderSgTheme();
-    else if (st === 'sgWrite') renderSgWriteSong();
-    else if (st === 'sgPerform') stage().innerHTML = waitingCard('🎵', 'Your song is on the TV!', 'The AI is performing YOUR lyrics. Listen.');
-    else if (st === 'sgVote') renderSgVotePhone();
-    else if (st === 'sgFinal') renderSgFinalPhone();
     else if (st === 'ssIntro') stage().innerHTML = waitingCard('😏', 'Shoot Your Shot is loading…', 'The AI is writing the profiles. Get your game face on.');
     else if (st === 'ssWrite') renderSsWrite();
     else if (st === 'ssJudge') { ssFlushDraft(); stage().innerHTML = waitingCard('💭', "She's reading every line…", 'Sweat it out.'); }
@@ -5406,85 +5151,6 @@ function renderSsWrite() {
       <p>You finished with <b style="color:var(--gold)">${myScore} point${myScore === 1 ? '' : 's'}</b>${champ ? ' — she owes you her entire life!' : '.'}</p></div>`;
   }
 
-
-  /* ---- One-Hit Wonder (phone) ---- */
-  let sgVoteKeyP = '', sgBallot = [];
-  const sgTextP = (k, s) => {
-    const o = (k.assign || {})[s];
-    return o ? (((k.drafts || {})[o] || {})[s] || '') : '';
-  };
-
-  function renderSgTheme() {
-    const k = room.song || {};
-    if ((k.themes || {})[pid]) { stage().innerHTML = waitingCard('🎵', 'Idea in!', 'The host picks the winner on the TV…'); return; }
-    stage().innerHTML = `
-      <div class="phone-title" style="color:var(--gold)">🎵 One-Hit Wonder</div>
-      <div class="phone-sub">We're writing a song together — the AI will <b>sing</b> it at the end. What should it be about?</div>
-      <input type="text" class="cap-ta" id="sgIdea" maxlength="60" placeholder="e.g. Greg's situationship…" style="min-height:0;height:auto;padding:14px;width:100%;margin-top:8px">
-      <button class="btn big" id="sgGo" style="width:100%;margin-top:14px" disabled>Pitch it ▶</button>`;
-    const inp = $('#sgIdea'), btn = $('#sgGo');
-    inp.oninput = () => { btn.disabled = !inp.value.trim(); };
-    btn.onclick = () => { const t = inp.value.trim(); if (t) { btn.disabled = true; R().child('song/themes/' + pid).set(t); } };
-  }
-
-  function renderSgWriteSong() {
-    const k = room.song || {};
-    const mine = SG_SECTIONS.map((lbl, s) => [lbl, s]).filter(([, s]) => (k.assign || {})[s] === pid);
-    if (!mine.length) { stage().innerHTML = waitingCard('🎵', 'The band is writing…', 'Watch the TV.'); return; }
-    stage().innerHTML = `
-      <div class="phone-title" style="color:var(--gold)">🎵 Your section${mine.length > 1 ? 's' : ''}</div>
-      <div class="status-card card" style="width:100%"><p style="margin:0;font-size:15px">Our song is about: <b>“${esc(k.theme || '')}”</b></p></div>
-      <div class="cap-timer" id="ssPTimer" style="font-size:30px;margin:8px 0"></div>
-      <div id="sgBoxes" style="width:100%"></div>
-      <div class="phone-sub" style="margin-top:8px">You are typing LIVE on the TV — no submit button. Whatever is there when time's up is in the song.</div>`;
-    ssStartPhoneTimer(90000);
-    const box = $('#sgBoxes');
-    mine.forEach(([lbl, s]) => {
-      const wrap = el('div', '', `
-        <div class="pr-persona" style="text-align:left;margin-top:12px">${lbl} <span style="color:var(--muted);font-weight:600;font-size:12px">— ${SG_HINTS[s]}</span></div>
-        <textarea class="cap-ta" id="sgTa${s}" maxlength="300" placeholder="your lyrics…" style="min-height:88px"></textarea>`);
-      box.appendChild(wrap);
-      const ta = wrap.querySelector('#sgTa' + s);
-      let last = 0, pend = null;
-      const push = () => { last = Date.now(); pend = null; R().child(`song/drafts/${pid}/${s}`).set(ta.value); };
-      ta.oninput = () => {
-        clearTimeout(pend);
-        if (Date.now() - last > 600) push();
-        else pend = setTimeout(push, 600);
-      };
-    });
-  }
-
-  function renderSgVotePhone() {
-    const k = room.song || {};
-    if ((k.votes || {})[pid] != null) { stage().innerHTML = waitingCard('🗳️', 'Vote cast', 'Waiting for the rest…'); return; }
-    const bk = 'sgB:' + SG_SECTIONS.map((l, s) => sgTextP(k, s)).join('|');
-    if (sgVoteKeyP !== bk) {
-      sgVoteKeyP = bk;
-      sgBallot = SG_SECTIONS.map((lbl, s) => [lbl, s]).filter(([, s]) => (k.assign || {})[s] !== pid);   // never your own
-    }
-    if (!sgBallot.length) { stage().innerHTML = waitingCard('😴', 'Nothing to vote on', 'Watch the TV…'); return; }
-    stage().innerHTML = `
-      <div class="phone-title" style="color:var(--gold)">🎵 Best section?</div>
-      <div class="phone-sub">Not your own — nice try.</div>
-      ${sgBallot.map(([lbl, s]) => `<button class="cap-pick" data-s="${s}" style="text-align:left"><b>${lbl}</b> — ${esc(sgTextP(k, s) || '(instrumental break)')}</button>`).join('')}`;
-    stage().querySelectorAll('.cap-pick').forEach(b2 => b2.onclick = () => {
-      if (((room.song || {}).votes || {})[pid] != null) return;
-      b2.classList.add('chosen');
-      R().child('song/votes/' + pid).set(+b2.dataset.s);
-    });
-  }
-
-  function renderSgFinalPhone() {
-    const k = room.song || {};
-    const myScore = (k.scores || {})[pid] || 0;
-    const ranked = Object.entries(k.scores || {}).sort((a, b) => b[1] - a[1]);
-    const champ = ranked[0] && ranked[0][0] === pid;
-    stage().innerHTML = `<div class="big-emoji">${champ ? '👑' : '🎵'}</div>
-      <div class="status-card card">
-      <h3>${champ ? 'Songwriter of the Night!' : 'Game over'}</h3>
-      <p>You finished with <b style="color:var(--gold)">${myScore} point${myScore === 1 ? '' : 's'}</b>${champ ? ' — Grammy incoming!' : '.'}</p></div>`;
-  }
 
   /* ---- shareable recap card (canvas → PNG) ---- */
   // cache-busted load: the page already cached these images WITHOUT CORS headers,
