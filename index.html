@@ -3791,17 +3791,47 @@ function renderSsWriteTV() {
         <div class="ss-card-name">${esc(k.name || '???')}</div></div>
     </div>`;
 
+  /* catalysts that keep her opening dilemma from ever repeating a formula —
+     the model builds its OWN situation around one of these */
+  const DT_SEEDS = [
+    'a screaming feud with her neighbor over a garden',
+    'doing something dumb with her mom (smelling salts involved)',
+    'owing money to a Russian guy she met at a casino',
+    'a pyramid scheme her aunt dragged her into',
+    'she stole something small and it escalated badly',
+    'a fake ID situation that snowballed',
+    'she keyed a car and the owner is hunting her down',
+    'a raccoon she secretly fed now lives in her walls',
+    'a revenge plot against a coworker that worked TOO well',
+    'she sold feet pics and a buyer found her real Instagram',
+    'a timeshare presentation she cannot escape',
+    'her dog ate something expensive belonging to a stranger',
+    'she accidentally joined a cult-y yoga retreat',
+    'a Craigslist couch deal that went sideways',
+    'she is catfishing someone and now they want to meet',
+    'her landlord, a broken lease, and a bathtub full of something illegal',
+    'a viral video of her that she needs deleted NOW',
+    'she crashed a stranger\u2019s wedding and got attached',
+    'a storage unit auction win with disturbing contents',
+    'she knows her boss\u2019s career-ending secret',
+    'a road trip with a guy she met six hours ago',
+    'a bingo hall rivalry with a ruthless 78-year-old woman',
+    'she fake-claimed a service dog and the airline is investigating',
+    'her situationship with a guy who might be in the mob',
+    'she told a small lie at work and is now in way too deep'
+  ];
+
   const dtMockDilemma = () => ({
-    dilemma: `Okay so, my ex texted me "u up?" at 2am... except he has a whole girlfriend now, and SHE found the messages and is DMing me. My roommate says block everyone. What do I actually do here?`,
+    dilemma: `Okay so my neighbor reported my Halloween decorations to the HOA, so I've been leaving one plastic flamingo on her lawn every single night for three weeks. She just installed cameras. My mom drove over — not to stop me, to help. Do I escalate or what?`,
     audioUrl: null
   });
   const dtMockOutcome = (goneWrong, isFinal) => ({
     outcome: goneWrong
-      ? `So I did exactly what you said. He showed up at my door. With his MOM. She asked what my intentions were with her son. I hid in my own bathroom for forty minutes.`
-      : `Okay, weirdly, that actually worked? He apologized, the girlfriend backed off, and for one shining moment my life made complete sense.`,
+      ? `So I did it. EXACTLY what you said. The cops came, there's a Ring camera video with 40,000 views, and my mom is in the comments defending me under her real name.`
+      : `I genuinely cannot believe this, but it worked? She took the cameras down and waved at me this morning. I feel like a war criminal who got a peace treaty.`,
     newSituation: isFinal ? '' : (goneWrong
-      ? `Except now his mom thinks we're dating and invited me to Sunday dinner. Do I go, or do I fake my own death?`
-      : `But now my roommate thinks I'm some kind of genius and wants me to fix HER love life too. Do I help her or run?`),
+      ? `Problem: the video went viral and the local news wants an interview. Do I go on TV in a disguise or fully lean in?`
+      : `But now the neighborhood Facebook group wants me to handle THEIR feuds. Do I become a lawn-ornament mercenary?`),
     goneWrong, audioUrl: null
   });
   const dtMockEpilogue = () => ({
@@ -3860,7 +3890,7 @@ function renderSsWriteTV() {
         <div class="tv-caption">💬 ${esc(k.name)} is working up the nerve<span class="accent">…</span></div>
         <div class="cap-stage">${k.photo ? dtGirlCard(k) : ''}</div>
         <div class="tv-sub">${k.photo ? '' : 'Painting her portrait<span class="dots"></span>'}</div>`;
-      const jobs = [aiCall('dtDilemma', { name: k.name }, 20000)];
+      const jobs = [aiCall('dtDilemma', { name: k.name, seed: DT_SEEDS[Math.floor(Math.random() * DT_SEEDS.length)] }, 20000)];
       if (!k.photo) jobs.push(aiCall('dtPortrait', { name: k.name }, 40000));
       const [out, portrait] = await Promise.all(jobs);   // her face + her problem, same wait
       if (!k.photo) {

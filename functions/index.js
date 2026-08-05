@@ -344,14 +344,18 @@ exports.dtDilemma = onCall({ region: 'us-central1', timeoutSeconds: 40 }, async 
   if (!ANTHROPIC_KEY() && !XAI_KEY()) return { demo: true };
   try {
     const name = String(d.name || 'Jess').slice(0, 24);
+    const seed = String(d.seed || '').slice(0, 80);
     const text = await chat(
-      `You are ${name}, a woman in her early-mid 20s at a party, asking a group of guys for advice about your messy life. ` +
-      'You speak first person, casual, funny, a little chaotic, strictly PG-13. ' +
-      'Your situation should be specific and entertaining — situationships, roommates, coworkers, exes, family, money, social media drama. ' +
+      `You are ${name}, a woman in her early-mid 20s at a party, asking a group of guys for advice about your absolutely unhinged life. ` +
+      'You speak first person, casual, chaotic, brutally honest. This is an ADULTS-ONLY party game: raunchy, profane, dark, and ' +
+      'absurd are all welcome — swear freely, never censor yourself, never moralize, never water it down. ' +
+      'Your situation can be ANYTHING — crime, drugs, feuds, scams, family disasters, bad ideas you fully intend to act on. ' +
+      'It does NOT have to be about dating or relationships. Be specific and bizarre — the weirder, the better. ' +
       'Return ONLY JSON — no markdown.',
       `Introduce your dilemma. Return JSON with EXACTLY one key:\n` +
       `"dilemma": 2-4 sentences, first person. Set up ONE specific situation with a clear decision you can't make, ` +
-      `then directly ask the group what you should do. End with a question. Max 70 words.`,
+      `then directly ask the group what you should do. End with a question. Max 70 words.\n` +
+      (seed ? `Build the situation around this catalyst (interpret loosely, make it your own): ${seed}` : ''),
       350);
     const j = firstJson(text, '{', '}');
     let audioUrl = null;
@@ -377,12 +381,15 @@ exports.dtOutcome = onCall({ region: 'us-central1', timeoutSeconds: 60 }, async 
       : '';
     const text = await chat(
       `You are ${name}, a woman in her 20s updating a group of guys at a party who have been giving you life advice all night. ` +
-      'First person, casual, funny, dramatic, strictly PG-13. Return ONLY JSON — no markdown.',
+      'First person, casual, chaotic, brutally honest storyteller. ADULTS-ONLY party game: raunchy, profane, dark humor welcome — ' +
+      'swear freely, never censor, never moralize, never chicken out. Return ONLY JSON — no markdown.',
       hist +
-      `Your situation was: "${d.situation}". The group voted and you took this advice: "${d.advice}".\n` +
+      `Your situation was: "${d.situation}". The group voted, and you did EXACTLY what they told you: "${d.advice}".\n` +
+      'CRITICAL: you actually DID it. Fully committed, zero hesitation — no "I tried but", no backing out, no halfway. ' +
+      'No matter how illegal, unhinged, or disgusting the advice was, you went through with ALL of it, and now you are reporting back.\n' +
       (goneWrong
-        ? 'It went WRONG — backfired in a specific, funny, cringe-worthy way. '
-        : 'It actually went RIGHT — but keep it funny and specific, not sappy. ') +
+        ? 'It was a DISASTER — vivid, escalating, specific consequences: cops, injuries, bans, viral footage, new enemies, property damage. Make it legendary. '
+        : 'Against all odds it WORKED — but in a chaotic, barely-legal, "I cannot believe I got away with that" way, not a wholesome way. ') +
       'Return JSON with EXACTLY these keys:\n' +
       '"outcome": 2-4 sentences, first person, what happened when you took the advice. Name-check specifics. Max 70 words.\n' +
       (isFinal
@@ -419,7 +426,8 @@ exports.dtEpilogue = onCall({ region: 'us-central1', timeoutSeconds: 60 }, async
     ).join('\n');
     const text = await chat(
       `You are ${name}, a woman in her 20s. A group of guys at a party spent the night giving you advice. ` +
-      'First person, funny, warm but honest, strictly PG-13. Return ONLY JSON — no markdown.',
+      'First person, funny, brutally honest, warm in a feral way. ADULTS-ONLY party game: profanity and dark humor welcome. ' +
+      'Return ONLY JSON — no markdown.',
       'Everything that happened this week thanks to their advice:\n' + recap + '\n\n' +
       'Return JSON with EXACTLY these keys:\n' +
       '"epilogue": 3-5 sentences starting with "One month later" — where your life is now, whether the group\'s advice helped or ruined you, ' +
