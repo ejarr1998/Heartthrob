@@ -454,3 +454,51 @@ exports.dtPortrait = onCall({ region: 'us-central1', timeoutSeconds: 60 }, async
     return { demo: true };
   }
 });
+
+/* ---- One-Hit Wonder: title via Grok/Claude, then an actual SUNG song via the
+   ElevenLabs Music API. If music generation is unavailable on the account the
+   client falls back to a spoken-word karaoke performance — game never wedges. */
+exports.sgPerform = onCall({ region: 'us-central1', timeoutSeconds: 180 }, async (req) => {
+  const d = req.data || {};
+  const sections = (Array.isArray(d.sections) ? d.sections : []).filter(s => s && s.text);
+  if (!sections.length) return { demo: true };
+  try {
+    const theme = String(d.theme || 'tonight').slice(0, 120);
+    let title = '';
+    if (XAI_KEY() || ANTHROPIC_KEY()) {
+      try {
+        title = (await chat(
+          'You title party songs. Reply with ONLY the title — 2-6 words, funny, PG-13, no quotes, no punctuation at the end.',
+          `Theme: ${theme}\nLyrics:\n` + sections.map(s => `${s.label}: ${s.text}`).join('\n'), 40)
+        ).trim().replace(/^["']+|["']+$/g, '').slice(0, 60);
+      } catch (e) { console.error('sg title failed', e.message); }
+    }
+    if (!title) title = theme.slice(0, 40);
+    let audioUrl = null;
+    if (ELEVENLABS_KEY()) {
+      try {
+        const lyrics = sections.map(s => `[${s.label}]\n${s.text}`).join('\n\n');
+        const prompt = (`A catchy comedic pop party anthem titled "${title}" about ${theme}. ` +
+          'Upbeat, huge singalong chorus, band energy. Lyrics:\n' + lyrics).slice(0, 4500);
+        const words = sections.reduce((n, s) => n + (s.text || '').split(/\s+/).length, 0);
+        const ms = Math.max(40000, Math.min(150000, words * 900));
+        const r = await fetch('https://api.elevenlabs.io/v1/music', {
+          method: 'POST',
+          headers: { 'xi-api-key': ELEVENLABS_KEY(), 'content-type': 'application/json' },
+          body: JSON.stringify({ prompt, music_length_ms: ms })
+        });
+        if (!r.ok) throw new Error('elevenlabs music ' + r.status + ': ' + (await r.text()).slice(0, 150));
+        const buf = Buffer.from(await r.arrayBuffer());
+        if (buf.length < 5000) throw new Error('music response too small: ' + buf.length);
+        const path = `songs/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.mp3`;
+        const bucket = getStorage().bucket();
+        await bucket.file(path).save(buf, { contentType: 'audio/mpeg', public: true });
+        audioUrl = `https://storage.googleapis.com/${bucket.name}/${path}`;
+      } catch (e) { console.error('sgPerform music failed', e); }
+    }
+    return { title, audioUrl };
+  } catch (e) {
+    console.error('sgPerform failed', e);
+    return { demo: true };
+  }
+});
