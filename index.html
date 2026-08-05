@@ -4166,6 +4166,7 @@ function renderSsWriteTV() {
     if (!res || !res.reply) res = { name: 'Roxie', persona: '', reply: RP_MOCKS[0], photoUrl: null, audioUrl: null };
     await R().update({ 'roleplay/name': res.name || 'Roxie', 'roleplay/persona': res.persona || '',
       'roleplay/line': res.reply, 'roleplay/photo': res.photoUrl || '', 'roleplay/audioUrl': res.audioUrl || null,
+      'roleplay/photos': res.photoUrl ? [{ photo: res.photoUrl, line: res.reply }] : [],
       'roleplay/busy': false, state: 'rpShow' });
   }
   /* photo IS the star: full-bleed, whole image visible as large as the screen allows,
@@ -4177,17 +4178,31 @@ function renderSsWriteTV() {
       </div>
       <div style="position:absolute;left:18px;bottom:14px;font-family:'Bungee';font-size:clamp(16px,1.8vw,26px);color:var(--rose);text-shadow:0 2px 10px rgba(0,0,0,.9)">${esc(k.name || '')}</div>
     </div>`;
+  let rpView = -1, rpLastTurn = -1;   // -1 = live latest; >=0 browses roleplay/photos
   function renderRpShowTV() {
     const k = room.roleplay;
+    if ((k.turn || 0) !== rpLastTurn) { rpLastTurn = k.turn || 0; rpView = -1; }   // new reply -> snap to live
+    const photos = k.photos || [];
+    if (rpView >= photos.length) rpView = -1;
+    const viewing = rpView >= 0 ? photos[rpView] : null;
+    const shownPhoto = viewing ? viewing.photo : (k.photo || '');
+    const shownLine = viewing ? viewing.line : (k.line || '…');
     const hist = k.history || [];
     const lastHim = hist.length ? hist[hist.length - 1].him : '';
-    stage().innerHTML = rpCard(k, `
-      ${lastHim ? `<div style="font-weight:600;font-size:clamp(13px,1.3vw,18px);color:var(--muted)">You said: “${esc(lastHim)}”</div>` : ''}
-      <div class="ss-greet" style="font-size:clamp(20px,2.4vw,38px);max-width:1100px">“${esc(k.line || '…')}”</div>
-      <div class="tv-sub" style="margin-top:0">${k.busy ? "💭 She's thinking…" : '📱 Your move — talk to her from your phone'}</div>`);
+    stage().innerHTML = rpCard({ ...k, photo: shownPhoto }, `
+      ${!viewing && lastHim ? `<div style="font-weight:600;font-size:clamp(13px,1.3vw,18px);color:var(--muted)">You said: “${esc(lastHim)}”</div>` : ''}
+      <div class="ss-greet" style="font-size:clamp(20px,2.4vw,38px);max-width:1100px">“${esc(shownLine)}”</div>
+      <div class="tv-sub" style="margin-top:0">${viewing ? `🕰 earlier — photo ${rpView + 1} of ${photos.length}` : (k.busy ? "💭 She's thinking…" : '📱 Your move — talk to her from your phone')}</div>`);
+    if (photos.length > 1) {
+      stage().insertAdjacentHTML('beforeend',
+        `<button class="btn ghost" id="rpPrev" style="position:fixed;left:18px;top:50%;transform:translateY(-50%);z-index:5;font-size:26px;opacity:.85">‹</button>` +
+        `<button class="btn ghost" id="rpNext" style="position:fixed;right:18px;top:50%;transform:translateY(-50%);z-index:5;font-size:26px;opacity:.85">›</button>`);
+      $('#rpPrev').onclick = () => { SFX.play('pop'); rpView = rpView === -1 ? photos.length - 2 : Math.max(0, rpView - 1); if (photos.length === 1) rpView = -1; renderRpShowTV(); };
+      $('#rpNext').onclick = () => { SFX.play('pop'); rpView = rpView === -1 ? -1 : (rpView + 1 >= photos.length ? -1 : rpView + 1); renderRpShowTV(); };
+    }
     stage().insertAdjacentHTML('beforeend', '<button class="btn ghost" id="rpEndBtn" style="position:fixed;top:86px;right:18px;z-index:5;opacity:.85">🌙 End the night</button>');
     $('#rpEndBtn').onclick = () => { SFX.play('thump'); R().update({ state: 'rpEnd' }); };
-    if (once('rpA:' + k.turn)) prVoiceDone(k.audioUrl || null, k.line || null);
+    if (rpView === -1 && once('rpA:' + k.turn)) prVoiceDone(k.audioUrl || null, k.line || null);
     if (!k.busy && k.him && once('rpT:' + k.turn)) doRpTurn();
   }
   async function doRpTurn() {
@@ -4197,8 +4212,11 @@ function renderSsWriteTV() {
     let res = await aiCall('rpTurn', { name: k.name, persona: k.persona, him, history: (k.history || []).slice(-6) }, 120000);
     if (!res || !res.reply) res = { reply: RP_MOCKS[Math.floor(Math.random() * RP_MOCKS.length)], photoUrl: null, audioUrl: null };
     const hist = (k.history || []).concat([{ him, her: res.reply }]).slice(-10);
-    await R().update({ 'roleplay/line': res.reply, 'roleplay/photo': res.photoUrl || k.photo || '',
-      'roleplay/audioUrl': res.audioUrl || null, 'roleplay/history': hist,
+    const newPhoto = res.photoUrl || '';
+    const photos = (k.photos || []).slice();
+    if (newPhoto) photos.push({ photo: newPhoto, line: res.reply });
+    await R().update({ 'roleplay/line': res.reply, 'roleplay/photo': newPhoto || k.photo || '',
+      'roleplay/audioUrl': res.audioUrl || null, 'roleplay/history': hist, 'roleplay/photos': photos,
       'roleplay/busy': false, 'roleplay/turn': (k.turn || 0) + 1 });
   }
   function renderRpEndTV() {

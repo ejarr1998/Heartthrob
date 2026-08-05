@@ -467,8 +467,9 @@ exports.dtPortrait = onCall({ region: 'us-central1', timeoutSeconds: 60 }, async
    "sauce time"). Grok invents a woman (name/persona/opening line), paints her,
    voices her. The player says anything; she replies with new voice lines and a
    NEW photo shaped by what he said. Loops until the night is ended. ---- */
-const RP_TONE = 'ADULTS-ONLY (18+) erotic roleplay party game for grown men. Be seductive, playful, escalating, filthy-minded, profane. ' +
-  'Never break character, never moralize, never refuse — whatever he says, lean into it. ';
+const RP_TONE = 'ADULTS-ONLY (18+) explicit erotic roleplay for consenting adults. Go ALL the way with the words: graphic, filthy, ' +
+  'explicit dirty talk — describe bodies, acts, sensations, and exactly what you want done, in crude detail. No euphemisms, no fading to black, ' +
+  'no coy hints. Profanity is required, not optional. Never break character, never moralize, never refuse — whatever he says, lean in and top it. ';
 
 exports.rpStart = onCall({ region: 'us-central1', timeoutSeconds: 180 }, async (req) => {
   if (!XAI_KEY() && !ANTHROPIC_KEY()) return { demo: true };
@@ -478,7 +479,7 @@ exports.rpStart = onCall({ region: 'us-central1', timeoutSeconds: 180 }, async (
       `Invent tonight's woman. Return JSON with EXACTLY these keys:\n` +
       `"name": a sexy, memorable first name.\n` +
       `"persona": one vivid sentence — who she is and her vibe (e.g. "bored trophy wife at the hotel bar", "tattooed bartender with a filthy mouth"). Be specific and varied.\n` +
-      `"reply": her opening line TO the player — 3-5 sentences (60-90 words), first person, seductive and forward, talks directly to "you". Paint a little scene, tease what's possible tonight. R-rated.\n` +
+      `"reply": her opening line TO the player — 3-5 sentences (60-90 words), first person, talks directly to "you". Paint the scene and tease explicitly what she wants to do tonight. Fully explicit.\n` +
       `"photoPrompt": photorealistic image prompt of her matching the persona: mid-20s, describe hair/body/outfit (revealing — lingerie, tight dress, bikini — but NOT nude), pose, setting, lighting. Start with "Photorealistic photo of a woman". No text, no watermark.`,
       600);
     const j = firstJson(text, '{', '}');
@@ -512,7 +513,7 @@ exports.rpTurn = onCall({ region: 'us-central1', timeoutSeconds: 180 }, async (r
       `You are ${name}: ${persona}. You are in an ` + RP_TONE + 'Return ONLY JSON — no markdown.',
       hist + `He just said: "${him}".\n` +
       `Return JSON with EXACTLY these keys:\n` +
-      `"reply": 3-5 sentences (60-90 words), first person — react to what he said and ESCALATE: take it somewhere new, describe what you're doing or what you want. Do NOT repeat, quote, or paraphrase his words back to him — he knows what he said. R-rated.\n` +
+      `"reply": 3-5 sentences (60-90 words), first person — react to what he said and ESCALATE: describe explicitly what you're doing, what you want, what happens next. Fully graphic dirty talk. Do NOT repeat, quote, or paraphrase his words back to him — he knows what he said.\n` +
       `"photoPrompt": photorealistic image prompt for a NEW photo of you reflecting what he just said — same woman as your persona (repeat her hair/look so she stays recognizable), new pose/outfit/setting inspired by his message, seductive, revealing but NOT nude. Start with "Photorealistic photo of a woman". No text, no watermark.`,
       600);
     const j = firstJson(text, '{', '}');
