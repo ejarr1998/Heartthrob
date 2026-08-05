@@ -3354,10 +3354,10 @@ function renderSsWriteTV() {
         ${ssScoreStrip()}
         <div class="tv-caption">😏 Round ${r + 1} of ${SS_ROUNDS} — shoot your shot<span class="accent">!</span></div>
         <div class="cap-timer" id="ccTimer"></div>
-        <div class="ss-card">
-          <div class="ss-card-photo">${mediaTag(prof.photo)}
+        <div class="ss-card" style="display:flex;align-items:stretch;width:min(1280px,94vw)">
+          <div class="ss-card-photo" style="width:min(470px,42vw);height:min(64vh,640px);flex:none">${mediaTag(prof.photo)}
             <div class="ss-card-name">${esc(prof.name)}, ${prof.age}</div></div>
-          <div class="ss-card-body">
+          <div class="ss-card-body" style="flex:1;justify-content:center;gap:16px;padding:24px 28px">
             <div class="ss-pillrow" id="ssPills"></div>
             <div id="ssPrompts" style="display:flex;flex-direction:column;gap:12px"></div>
           </div>
