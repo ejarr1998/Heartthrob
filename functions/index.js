@@ -247,3 +247,108 @@ exports.prDeliberate = onCall({ region: 'us-central1', timeoutSeconds: 60 }, asy
     return { demo: true };
   }
 });
+
+/* ---- Girl Talk: one girl, an AI-generated dilemma, the room gives her advice ----
+   dtDilemma  — she introduces her messy situation and asks for advice (voiced).
+   dtOutcome  — she took the winning advice; what happened (skewed toward disaster,
+                decided CLIENT-side via goneWrong flag) + her new problem (voiced).
+   dtEpilogue — "one month later" wrap-up judging the whole room's advice (voiced). */
+exports.dtDilemma = onCall({ region: 'us-central1', timeoutSeconds: 40 }, async (req) => {
+  const d = req.data || {};
+  if (!ANTHROPIC_KEY()) return { demo: true };
+  try {
+    const name = String(d.name || 'Jess').slice(0, 24);
+    const text = await claude(
+      `You are ${name}, a woman in her early-mid 20s at a party, asking a group of guys for advice about your messy life. ` +
+      'You speak first person, casual, funny, a little chaotic, strictly PG-13. ' +
+      'Your situation should be specific and entertaining — situationships, roommates, coworkers, exes, family, money, social media drama. ' +
+      'Return ONLY JSON — no markdown.',
+      `Introduce your dilemma. Return JSON with EXACTLY one key:\n` +
+      `"dilemma": 2-4 sentences, first person. Set up ONE specific situation with a clear decision you can't make, ` +
+      `then directly ask the group what you should do. End with a question. Max 70 words.`,
+      350);
+    const j = firstJson(text, '{', '}');
+    let audioUrl = null;
+    if (ELEVENLABS_KEY() && j.dilemma) {
+      audioUrl = await ttsToStorage(j.dilemma).catch(e => { console.error('dilemma tts failed', e); return null; });
+    }
+    return { dilemma: j.dilemma || null, audioUrl };
+  } catch (e) {
+    console.error('dtDilemma failed', e);
+    return { demo: true };
+  }
+});
+
+exports.dtOutcome = onCall({ region: 'us-central1', timeoutSeconds: 60 }, async (req) => {
+  const d = req.data || {};
+  if (!ANTHROPIC_KEY()) return { demo: true };
+  try {
+    const name = String(d.name || 'Jess').slice(0, 24);
+    const goneWrong = !!d.goneWrong;
+    const isFinal = !!d.final;
+    const hist = Array.isArray(d.history) && d.history.length
+      ? 'So far this week: ' + d.history.map(h => `When "${h.situation}" the group told you to "${h.advice}" and then ${h.outcome}`).join(' / ') + '. '
+      : '';
+    const text = await claude(
+      `You are ${name}, a woman in her 20s updating a group of guys at a party who have been giving you life advice all night. ` +
+      'First person, casual, funny, dramatic, strictly PG-13. Return ONLY JSON — no markdown.',
+      hist +
+      `Your situation was: "${d.situation}". The group voted and you took this advice: "${d.advice}".\n` +
+      (goneWrong
+        ? 'It went WRONG — backfired in a specific, funny, cringe-worthy way. '
+        : 'It actually went RIGHT — but keep it funny and specific, not sappy. ') +
+      'Return JSON with EXACTLY these keys:\n' +
+      '"outcome": 2-4 sentences, first person, what happened when you took the advice. Name-check specifics. Max 70 words.\n' +
+      (isFinal
+        ? '"newSituation": empty string.'
+        : '"newSituation": 1-2 sentences — a NEW problem this outcome created (even a good outcome causes a new wrinkle). ' +
+          'It needs a clear decision and you end asking the group what to do now. Max 45 words.'),
+      500);
+    const j = firstJson(text, '{', '}');
+    const spoken = (j.outcome || '') + (j.newSituation ? ' ' + j.newSituation : '');
+    let audioUrl = null;
+    if (ELEVENLABS_KEY() && spoken.trim()) {
+      audioUrl = await ttsToStorage(spoken).catch(e => { console.error('outcome tts failed', e); return null; });
+    }
+    return {
+      outcome: j.outcome || null,
+      newSituation: isFinal ? '' : (j.newSituation || ''),
+      goneWrong,
+      audioUrl
+    };
+  } catch (e) {
+    console.error('dtOutcome failed', e);
+    return { demo: true };
+  }
+});
+
+exports.dtEpilogue = onCall({ region: 'us-central1', timeoutSeconds: 60 }, async (req) => {
+  const d = req.data || {};
+  if (!ANTHROPIC_KEY()) return { demo: true };
+  try {
+    const name = String(d.name || 'Jess').slice(0, 24);
+    const hist = Array.isArray(d.history) ? d.history : [];
+    const recap = hist.map(h =>
+      `- ${h.adviceBy} told her to "${h.advice}" -> ${h.goneWrong ? 'DISASTER' : 'it worked'}: ${h.outcome}`
+    ).join('\n');
+    const text = await claude(
+      `You are ${name}, a woman in her 20s. A group of guys at a party spent the night giving you advice. ` +
+      'First person, funny, warm but honest, strictly PG-13. Return ONLY JSON — no markdown.',
+      'Everything that happened this week thanks to their advice:\n' + recap + '\n\n' +
+      'Return JSON with EXACTLY these keys:\n' +
+      '"epilogue": 3-5 sentences starting with "One month later" — where your life is now, whether the group\'s advice helped or ruined you, ' +
+      'and a final verdict on them as advice-givers. Max 90 words.\n' +
+      '"shoutout": one sentence calling out the single best OR worst piece of advice by the giver\'s first name.',
+      500);
+    const j = firstJson(text, '{', '}');
+    const spoken = (j.epilogue || '') + (j.shoutout ? ' ' + j.shoutout : '');
+    let audioUrl = null;
+    if (ELEVENLABS_KEY() && spoken.trim()) {
+      audioUrl = await ttsToStorage(spoken).catch(e => { console.error('epilogue tts failed', e); return null; });
+    }
+    return { epilogue: j.epilogue || null, shoutout: j.shoutout || null, audioUrl };
+  } catch (e) {
+    console.error('dtEpilogue failed', e);
+    return { demo: true };
+  }
+});

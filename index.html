@@ -1807,6 +1807,15 @@ const TV = (() => {
     } else if (st === 'prBuild') {
       const k2 = room.review || {}, missing = players().filter(([pid]) => !((k2.profiles || {})[pid]));
       armIdle('prBuild', missing.length > 0, missing.length === 1 ? missing[0][0] : null, 52000);
+    } else if (st === 'dlSetup') {
+      const missing = players().filter(([pid]) => !((room.dilemma || {}).girls || {})[pid]);
+      armIdle('dlSetup', missing.length > 0, missing.length === 1 ? missing[0][0] : null, 52000);
+    } else if (st === 'dlWrite') {
+      const k3 = room.dilemma || {}, missing = players().filter(([pid]) => !(k3.advice || {})[pid]);
+      armIdle('dlW:' + k3.round, missing.length > 0, missing.length === 1 ? missing[0][0] : null, 52000);
+    } else if (st === 'dlVote') {
+      const k3 = room.dilemma || {}, missing = players().filter(([pid]) => (k3.votes || {})[pid] == null);
+      armIdle('dlV:' + k3.round, missing.length > 0, missing.length === 1 ? missing[0][0] : null);
     } else armIdle('none', false);
     // sudden-death heartbeat: only while a rematch duel is being picked
     const wantHB = st === 'sdDuel' && room.showdown && room.showdown.duel && room.showdown.duel.rematch;
@@ -1838,6 +1847,12 @@ const TV = (() => {
     else if (st === 'prReview') { if (once('prReview:' + room.review.idx)) playPrReview(); }
     else if (st === 'prDebate') { if (once('prDebate')) playPrDebate(); }
     else if (st === 'prFinal') { if (once('prFinal')) renderPrFinal(); }
+    else if (st === 'dlSetup') renderDlSetupTV();
+    else if (st === 'dlDilemma') { if (once('dlDilemma')) playDlDilemma(); }
+    else if (st === 'dlWrite') renderDlWriteTV();
+    else if (st === 'dlVote') renderDlVoteTV();
+    else if (st === 'dlOutcome') { if (once('dlOutcome:' + room.dilemma.round)) playDlOutcome(); }
+    else if (st === 'dlFinal') { if (once('dlFinal')) playDlFinal(); }
     else if (st === 'ssIntro') renderSsIntroTV();
     else if (st === 'ssWrite') renderSsWriteTV();
     else if (st === 'ssJudge') { if (once('ssJudge:' + room.shoot.round)) playSsJudge(); }
@@ -1872,6 +1887,7 @@ const TV = (() => {
         <button class="btn big gold" id="ccBtn" ${ps.length < 3 ? 'disabled' : ''}>📸 Caption Contest ▶</button>
         <button class="btn big" id="ssBtn" ${ps.length < 2 ? 'disabled' : ''}>😏 Shoot Your Shot ▶</button>
         <button class="btn big" id="prBtn" ${ps.length < 2 ? 'disabled' : ''}>😈 Profile Review ▶</button>
+        <button class="btn big teal" id="dtBtn" ${ps.length < 2 ? 'disabled' : ''}>💬 Girl Talk ▶</button>
       </div>
       <div class="tv-sub">${ps.length < 2 ? 'Need at least 2 players' : ps.length > 6 ? 'Max 6 players!' : ps.length + ' player' + (ps.length > 1 ? 's' : '') + ' ready' + (ps.length < 3 ? ' · Showdown & Contest need 3+' : '')}</div>`;
     if (window.QRCode) new QRCode($('#lobbyQR'), { text: location.origin + location.pathname, width: 150, height: 150, correctLevel: QRCode.CorrectLevel.M });
@@ -1905,6 +1921,9 @@ const TV = (() => {
     const prb = s.querySelector('#prBtn');
     if (ps.length > 6) prb.disabled = true;
     prb.onclick = () => { prb.disabled = true; startReview(); };
+    const dtb = s.querySelector('#dtBtn');
+    if (ps.length > 6) dtb.disabled = true;
+    dtb.onclick = () => { dtb.disabled = true; startDilemma(); };
   }
 
   /* ---------- arrow-through-heart start FX ---------- */
@@ -3739,6 +3758,333 @@ function renderSsWriteTV() {
     $('#prAgainBtn').onclick = async () => { await db.ref('rooms/' + code).remove(); sessionStorage.removeItem('ht_tv'); location.reload(); };
   }
 
+  /* ================= GIRL TALK (mode: dilemma) =================
+     A girl (a player's camera-roll photo + a name they give her) has an
+     AI-generated dilemma she VOICES to the room. Everyone writes advice on
+     their phone → all advice cascades on the TV → the room votes which one
+     she takes → she voices what happened (skewed ~70% toward disaster, which
+     spawns her next problem) → 3 rounds → "one month later" epilogue + podium. */
+  const DL_ROUNDS = 3, DL_SETUP_MS = 90000, DL_WRITE_MS = 75000, DL_VOTE_MS = 30000;
+  let dlVoteKey = '', dlVoteShown = 0;
+
+  const dtScoreStrip = () => {
+    const k = room.dilemma, ps = players();
+    const max = Math.max(...ps.map(([pid]) => (k.scores || {})[pid] || 0));
+    return `<div class="score-strip">` + ps.map(([pid, p]) => {
+      const sc = (k.scores || {})[pid] || 0;
+      return `<div class="score-chip${sc === max && max > 0 ? ' lead' : ''}">${pav(p.avatar)}${esc(p.name)} · ${sc}</div>`;
+    }).join('') + `</div>`;
+  };
+  const dtGirlCard = (k, h) => `
+    <div class="ss-card" style="width:min(400px,38vw)">
+      <div class="ss-card-photo" style="height:${h || 'min(40vh,400px)'}">${mediaTag(k.photo || '')}
+        <div class="ss-card-name">${esc(k.name || '???')}</div></div>
+    </div>`;
+
+  const dtMockDilemma = () => ({
+    dilemma: `Okay so, my ex texted me "u up?" at 2am... except he has a whole girlfriend now, and SHE found the messages and is DMing me. My roommate says block everyone. What do I actually do here?`,
+    audioUrl: null
+  });
+  const dtMockOutcome = (goneWrong, isFinal) => ({
+    outcome: goneWrong
+      ? `So I did exactly what you said. He showed up at my door. With his MOM. She asked what my intentions were with her son. I hid in my own bathroom for forty minutes.`
+      : `Okay, weirdly, that actually worked? He apologized, the girlfriend backed off, and for one shining moment my life made complete sense.`,
+    newSituation: isFinal ? '' : (goneWrong
+      ? `Except now his mom thinks we're dating and invited me to Sunday dinner. Do I go, or do I fake my own death?`
+      : `But now my roommate thinks I'm some kind of genius and wants me to fix HER love life too. Do I help her or run?`),
+    goneWrong, audioUrl: null
+  });
+  const dtMockEpilogue = () => ({
+    epilogue: `One month later... I am single, my roommate is single, and somehow the ex's mom and I are brunch friends now. You people should not legally be allowed to give advice. But honestly? Best worst night ever.`,
+    shoutout: `Whoever told me to text him back — we need to have a conversation.`,
+    audioUrl: null
+  });
+
+  async function startDilemma() {
+    const ps = players(), scores = {};
+    ps.forEach(([pid]) => scores[pid] = 0);
+    playStartFx(Math.random() < .5 ? 'vo_start_1' : 'vo_start_2');
+    R().update({ state: 'dlSetup', mode: 'dilemma',
+      dilemma: { girls: null, girlPid: null, name: '', photo: '', situation: '', opening: null, round: 0,
+        advice: null, votes: null, winning: null, outcome: null, history: [], scores, epilogue: null } });
+  }
+
+  /* ---- setup: everyone submits a candidate girl, the TV casts the lead ---- */
+  function renderDlSetupTV() {
+    const k = room.dilemma, ps = players(), girls = k.girls || {};
+    if (once('snd:dlSetup')) { SFX.play('whoosh'); armCcTimer(DL_SETUP_MS, 'dlSetup', () => once('dlSetupTO') && dlSetupDone(null)); }
+    stage().innerHTML = `
+      ${dtScoreStrip()}
+      <div class="tv-caption">💬 Cast our girl<span class="accent">!</span></div>
+      <div class="cap-timer" id="ccTimer"></div>
+      <div class="tv-sub" style="max-width:min(940px,84vw);font-size:clamp(16px,1.8vw,24px)">On your phone: pick a photo from your camera roll and <b>give her a name</b>.<br>She is about to need a LOT of advice. Tap a girl on the TV to cast her.</div>
+      <div class="waiting-avatars" style="margin:14px 0 6px">${ps.map(([pid, p]) => `<div class="wa${girls[pid] ? ' done' : ''}"><img src="${p.avatar}" alt=""></div>`).join('')}</div>
+      <div id="dlGirls" style="display:flex;gap:18px;flex-wrap:wrap;justify-content:center;margin-top:8px"></div>`;
+    const box = $('#dlGirls');
+    Object.entries(girls).forEach(([gpid, g]) => {
+      const card = el('div', 'draft-card', mediaTag(g.photo));
+      card.style.cssText = 'width:150px;height:190px;cursor:pointer;position:relative;overflow:hidden;border-radius:16px';
+      const tag = el('div', '', `<div style="position:absolute;left:0;right:0;bottom:0;padding:22px 8px 8px;background:linear-gradient(transparent,rgba(8,5,16,.94));color:var(--cream);font-family:'Bungee';font-size:15px;text-align:center">${esc(g.name)}</div>`);
+      card.appendChild(tag);
+      card.onclick = () => { clearCcTimer(); SFX.play('gold'); dlSetupDone(gpid); };
+      box.appendChild(card);
+    });
+    const entries = Object.entries(girls);
+    if (ps.every(([pid]) => girls[pid]) && entries.length === 1 && once('dlSolo')) { clearCcTimer(); dlSetupDone(entries[0][0]); }
+  }
+
+  function dlSetupDone(gpid) {
+    const girls = (room.dilemma || {}).girls || {}, entries = Object.entries(girls);
+    let pick = gpid && girls[gpid] ? Object.assign({ pid: gpid }, girls[gpid]) : null;
+    if (!pick && entries.length) { const e = shuffle(entries)[0]; pick = Object.assign({ pid: e[0] }, e[1]); }
+    if (!pick) pick = { pid: null, name: 'Jess', photo: (players()[0] || [null, {}])[1].avatar || '' };
+    R().update({ 'dilemma/girlPid': pick.pid, 'dilemma/name': pick.name, 'dilemma/photo': pick.photo, state: 'dlDilemma' });
+  }
+
+  /* ---- she voices her dilemma ---- */
+  async function playDlDilemma() {
+    const k = room.dilemma;
+    let dl = k.opening;
+    if (!dl) {
+      stage().innerHTML = `${dtScoreStrip()}
+        <div class="tv-caption">💬 ${esc(k.name)} is working up the nerve<span class="accent">…</span></div>
+        <div class="cap-stage">${dtGirlCard(k)}</div>`;
+      dl = await aiCall('dtDilemma', { name: k.name }, 20000);
+      if (!dl || !dl.dilemma) dl = dtMockDilemma();
+      await R().update({ 'dilemma/opening': dl, 'dilemma/situation': dl.dilemma });
+    }
+    stage().innerHTML = `${dtScoreStrip()}
+      <div class="tv-caption">💬 ${esc(k.name)} needs advice<span class="accent">!</span></div>
+      <div class="cap-stage" style="align-items:center">
+        ${dtGirlCard(k)}
+        <div class="pr-verdict" id="dlBubble" style="flex:1;min-width:min(560px,48vw);display:none">
+          <div class="pr-persona">💬 <b>${esc(k.name)}</b></div>
+          <div class="pr-comment" style="font-size:clamp(18px,2vw,30px)">“${esc(dl.dilemma)}”</div>
+        </div>
+      </div>`;
+    await sleep(1400);
+    const bub = $('#dlBubble');
+    if (bub) { bub.style.display = ''; bub.style.animation = 'slideUp .5s both'; SFX.play('whoosh'); }
+    await prVoiceDone(dl.audioUrl, dl.dilemma);   // she finishes before the room writes
+    await sleep(600);
+    if (room.state !== 'dlDilemma') return;
+    const nextBtn = el('button', 'btn big gold', 'Help her out ▶');
+    nextBtn.style.cssText = 'margin-top:20px;font-size:clamp(18px,1.8vw,26px)';
+    stage().appendChild(nextBtn);
+    nextBtn.onclick = () => {
+      nextBtn.disabled = true; SFX.play('whoosh');
+      R().update({ state: 'dlWrite', 'dilemma/advice': null, 'dilemma/votes': null, 'dilemma/winning': null, 'dilemma/outcome': null });
+    };
+  }
+
+  /* ---- everyone writes advice ---- */
+  function renderDlWriteTV() {
+    const k = room.dilemma, ps = players(), adv = k.advice || {};
+    if (once('snd:dlW:' + k.round)) {
+      SFX.play('whoosh');
+      VOICE.say(k.round === DL_ROUNDS - 1 ? 'vo_final_round' : VOICE.pickFresh(['vo_round_1', 'vo_round_2', 'vo_round_3']));
+      armCcTimer(DL_WRITE_MS, 'dlWrite', () => once('dlWTO:' + k.round) && dlWriteDone());
+    }
+    stage().innerHTML = `
+      ${dtScoreStrip()}
+      <div class="tv-caption">💬 Round ${k.round + 1} of ${DL_ROUNDS} — give ${esc(k.name)} advice<span class="accent">!</span></div>
+      <div class="cap-timer" id="ccTimer"></div>
+      <div class="ss-line" style="max-width:min(1000px,86vw)">“${esc(k.situation)}”<div class="ss-who"><span>— ${esc(k.name)}</span></div></div>
+      <div class="waiting-avatars" style="margin-top:16px">${ps.map(([pid, p]) => `<div class="wa${adv[pid] ? ' done' : ''}"><img src="${p.avatar}" alt=""></div>`).join('')}</div>`;
+    if (ps.every(([pid]) => adv[pid]) && once('dlAllIn:' + k.round)) { clearCcTimer(); VOICE.say('vo_votes_locked', { throttle: .4 }); dlWriteDone(); }
+  }
+
+  function dlWriteDone() {
+    const k = room.dilemma, adv = k.advice || {}, ids = Object.keys(adv);
+    if (!ids.length) {   // nobody wrote a thing — she wings it
+      R().update({ 'dilemma/winning': { pid: null, text: 'Honestly? Just do whatever feels right.' }, state: 'dlOutcome' });
+      return;
+    }
+    if (ids.length < 2) {   // one brave soul — no vote needed
+      R().update({ 'dilemma/winning': { pid: ids[0], text: adv[ids[0]] }, state: 'dlOutcome' });
+      return;
+    }
+    R().update({ state: 'dlVote' });
+  }
+
+  /* ---- the room votes which advice she takes ---- */
+  function renderDlVoteTV() {
+    const k = room.dilemma, adv = Object.entries(k.advice || {}), votes = k.votes || {};
+    const key = 'dlV:' + k.round;
+    if (dlVoteKey !== key) {
+      dlVoteKey = key;
+      dlVoteShown = 0;
+      if (once('snd:' + key)) { SFX.play('whoosh'); armCcTimer(DL_VOTE_MS, 'dlVote', () => once('dlVTO:' + k.round) && dlResolveVotes()); }
+      stage().innerHTML = `
+        ${dtScoreStrip()}
+        <div class="tv-caption">💬 Which advice does she take<span class="accent">?</span></div>
+        <div class="cap-timer" id="ccTimer"></div>
+        <div class="ss-field" id="dlField"></div>
+        <div class="tv-sub">Phones: vote for the advice ${esc(k.name)} should take — not your own 👀</div>
+        <div class="waiting-avatars" id="dlVoters" style="margin-top:10px"></div>`;
+    }
+    const field = $('#dlField');
+    while (field && dlVoteShown < adv.length) {   // cascade, anonymous until the outcome
+      const t = adv[dlVoteShown++][1];
+      const c = el('div', 'ss-oth', `“${esc(t)}”`);
+      c.style.animation = 'popIn .3s both';
+      field.appendChild(c);
+      SFX.play('whoosh');
+    }
+    const voters = $('#dlVoters');
+    if (voters) voters.innerHTML = players().map(([pid, p]) =>
+      `<div class="wa${votes[pid] != null ? ' done' : ''}"><img src="${p.avatar}" alt=""></div>`).join('');
+    if (players().every(([pid]) => votes[pid] != null) && once('dlVotesIn:' + k.round)) { clearCcTimer(); dlResolveVotes(); }
+  }
+
+  function dlResolveVotes() {
+    const k = room.dilemma, adv = k.advice || {}, tally = {};
+    Object.values(k.votes || {}).forEach(v => { if (adv[v] != null) tally[v] = (tally[v] || 0) + 1; });
+    let best = null, bestN = -1;
+    shuffle(Object.keys(adv)).forEach(pid2 => {   // shuffled = fair coin-flip on ties
+      const n = tally[pid2] || 0;
+      if (n > bestN) { bestN = n; best = pid2; }
+    });
+    if (!best) best = shuffle(Object.keys(adv))[0] || null;
+    R().update({ 'dilemma/winning': { pid: best, text: best ? adv[best] : 'Just follow your heart, girl.' }, state: 'dlOutcome' });
+  }
+
+  /* ---- she took the advice… and reports back ---- */
+  async function playDlOutcome() {
+    const k = room.dilemma, win = k.winning || {};
+    const winPl = win.pid ? (room.players[win.pid] || {}) : null;
+    let out = k.outcome;
+    if (!out) {
+      stage().innerHTML = `
+        ${dtScoreStrip()}
+        <div class="tv-caption">💬 ${esc(k.name)} takes the advice<span class="accent">…</span></div>
+        <div class="cap-stage" style="align-items:center">
+          ${dtGirlCard(k, 'min(28vh,280px)')}
+          <div class="pr-verdict" style="flex:1;min-width:min(560px,48vw)">
+            <div class="pr-persona">🏆 <b>The room's pick${winPl ? ' — ' + esc(winPl.name || '???') : ''}</b></div>
+            <div class="pr-comment" style="font-size:clamp(18px,2vw,30px)">“${esc(win.text || '')}”</div>
+          </div>
+        </div>
+        <div class="tv-sub">${esc(k.name)} is actually doing it<span class="dots"></span></div>`;
+      const isFinal = k.round + 1 >= DL_ROUNDS;
+      const goneWrong = Math.random() < .7;   // life skews disastrous — more fuel for the next round
+      let res = await aiCall('dtOutcome', {
+        name: k.name, situation: k.situation, advice: win.text || '',
+        history: (k.history || []).map(h => ({ situation: h.situation, advice: h.advice, outcome: h.outcome })),
+        goneWrong, final: isFinal
+      }, 30000);
+      if (!res || !res.outcome) res = dtMockOutcome(goneWrong, isFinal);
+      res.goneWrong = goneWrong;
+      const hist = [...(k.history || []), {
+        situation: k.situation, advice: win.text || '',
+        advicePid: win.pid || null, adviceBy: winPl ? (winPl.name || '???') : 'The void',
+        outcome: res.outcome, goneWrong
+      }];
+      const u = { 'dilemma/outcome': res, 'dilemma/history': hist };
+      if (win.pid) u[`dilemma/scores/${win.pid}`] = ((k.scores || {})[win.pid] || 0) + 150;
+      await R().update(u);
+      out = res;
+    }
+    stage().innerHTML = `
+      ${dtScoreStrip()}
+      <div class="tv-caption">💬 ${esc(k.name)} took the advice<span class="accent">…</span></div>
+      <div class="cap-stage" style="align-items:center">
+        ${dtGirlCard(k, 'min(28vh,280px)')}
+        <div style="flex:1;min-width:min(560px,48vw);display:flex;flex-direction:column;gap:14px">
+          <div class="pr-verdict">
+            <div class="pr-persona">🏆 <b>Winning advice${winPl ? ' — ' + esc(winPl.name || '???') + ' · +150' : ''}</b></div>
+            <div class="pr-comment">“${esc(win.text || '')}”</div>
+          </div>
+          <div class="pr-verdict" id="dlResult" style="display:none">
+            <div class="pr-persona">${out.goneWrong ? '💥' : '✨'} <b>${out.goneWrong ? 'It went WRONG' : 'It actually worked'}</b></div>
+            <div class="pr-comment" style="font-size:clamp(17px,1.9vw,28px)">“${esc(out.outcome)}”</div>
+          </div>
+          <div class="pr-verdict" id="dlNewSit" style="display:none">
+            <div class="pr-persona">🚨 <b>Her new problem</b></div>
+            <div class="pr-comment" style="font-size:clamp(17px,1.9vw,28px)">“${esc(out.newSituation || '')}”</div>
+          </div>
+        </div>
+      </div>`;
+    SFX.play('gold');
+    await sleep(2200);
+    const rCard = $('#dlResult');
+    if (rCard) { rCard.style.display = ''; rCard.style.animation = 'slideUp .5s both'; }
+    SFX.play(out.goneWrong ? 'thump' : 'gold');
+    if (out.newSituation) {   // her new problem lands about when she SAYS it in the audio
+      const words = (out.outcome || '').split(/\s+/).length;
+      setTimeout(() => {
+        const ns = $('#dlNewSit');
+        if (ns && room.state === 'dlOutcome') { ns.style.display = ''; ns.style.animation = 'slideUp .5s both'; SFX.play('whoosh'); }
+      }, Math.min(20000, Math.max(2500, words * 380)));
+    }
+    await prVoiceDone(out.audioUrl, (out.outcome || '') + (out.newSituation ? ' ' + out.newSituation : ''));
+    await sleep(800);
+    if (room.state !== 'dlOutcome') return;
+    const isFinal = k.round + 1 >= DL_ROUNDS;
+    const nextBtn = el('button', 'btn big gold', isFinal ? 'One month later… ▶' : 'Her new problem ▶');
+    nextBtn.style.cssText = 'margin-top:20px;font-size:clamp(18px,1.8vw,26px)';
+    stage().appendChild(nextBtn);
+    nextBtn.onclick = () => {
+      nextBtn.disabled = true; SFX.play('whoosh');
+      if (isFinal) R().update({ state: 'dlFinal' });
+      else R().update({
+        state: 'dlWrite', 'dilemma/round': k.round + 1,
+        'dilemma/situation': out.newSituation || k.situation,
+        'dilemma/advice': null, 'dilemma/votes': null, 'dilemma/winning': null, 'dilemma/outcome': null
+      });
+    };
+  }
+
+  /* ---- finale: "one month later…" epilogue + Advice MVP podium ---- */
+  async function playDlFinal() {
+    const k = room.dilemma;
+    let epi = k.epilogue;
+    if (!epi) {
+      stage().innerHTML = `${dtScoreStrip()}
+        <div class="tv-caption">💬 One month later<span class="accent">…</span></div>
+        <div class="cap-stage">${dtGirlCard(k)}</div>
+        <div class="tv-sub">${esc(k.name)} is typing<span class="dots"></span></div>`;
+      epi = await aiCall('dtEpilogue', {
+        name: k.name,
+        history: (k.history || []).map(h => ({ advice: h.advice, adviceBy: h.adviceBy, outcome: h.outcome, goneWrong: h.goneWrong }))
+      }, 30000);
+      if (!epi || !epi.epilogue) epi = dtMockEpilogue();
+      await R().update({ 'dilemma/epilogue': epi });
+    }
+    stage().innerHTML = `
+      ${dtScoreStrip()}
+      <div class="tv-caption">💬 One month later<span class="accent">…</span></div>
+      <div class="cap-stage" style="align-items:center">
+        ${dtGirlCard(k, 'min(30vh,300px)')}
+        <div style="flex:1;min-width:min(560px,48vw);display:flex;flex-direction:column;gap:14px">
+          <div class="pr-verdict"><div class="pr-persona">📖 <b>${esc(k.name)}'s update</b></div>
+            <div class="pr-comment" style="font-size:clamp(17px,1.9vw,28px)">“${esc(epi.epilogue)}”</div></div>
+          ${epi.shoutout ? `<div class="pr-verdict" id="dlShout" style="display:none"><div class="pr-persona">📣 <b>Shoutout</b></div>
+            <div class="pr-comment" style="font-size:clamp(16px,1.8vw,26px)">“${esc(epi.shoutout)}”</div></div>` : ''}
+        </div>
+      </div>
+      <div id="dlPodium"></div>`;
+    await prVoiceDone(epi.audioUrl, (epi.epilogue || '') + (epi.shoutout ? ' ' + epi.shoutout : ''));
+    const sh = $('#dlShout');
+    if (sh) { sh.style.display = ''; sh.style.animation = 'slideUp .5s both'; SFX.play('gold'); }
+    await sleep(1200);
+    if (room.state !== 'dlFinal') return;
+    const ranked = players().map(([pid, p]) => [pid, p, (k.scores || {})[pid] || 0]).sort((a, b) => b[2] - a[2]);
+    confettiBurst(140);
+    SFX.play('fanfare');
+    VOICE.say('vo_showcase');
+    const pods = ranked.map(([pid, p, sc], i) => `
+      <div class="sd-pod card${i === 0 ? ' first' : ''}" style="animation-delay:${i * .15}s">
+        ${i === 0 ? '<div class="crown">👑</div>' : ''}
+        ${pav(p.avatar)}<b>${esc(p.name)}</b><span class="pts">${sc} pt${sc === 1 ? '' : 's'}</span>
+      </div>`).join('');
+    $('#dlPodium').innerHTML = `
+      <div class="tv-caption" style="font-size:clamp(24px,3vw,42px);margin-top:18px">👑 Advice MVP<span class="accent">!</span></div>
+      <div class="sd-podium">${pods}</div>
+      <div class="tv-sub" style="margin-top:22px"><button class="btn ghost" id="dlAgainBtn">🔁 New game</button></div>`;
+    $('#dlAgainBtn').onclick = async () => { await db.ref('rooms/' + code).remove(); sessionStorage.removeItem('ht_tv'); location.reload(); };
+  }
+
   function renderSsFinal() {
     const k = room.shoot;
     const ranked = players().map(([pid, p]) => [pid, p, (k.scores || {})[pid] || 0]).sort((a, b) => b[2] - a[2]);
@@ -3869,7 +4215,7 @@ const Player = (() => {
       sd.duelIdx, d.rematch, !!(sd.kept && sd.kept[pid]), !!(d.cards && d.cards[pid]), d.votes && d.votes[pid] != null,
       (room.caption || {}).round, (room.caption || {}).matchupIdx, !!(room.caption || {}).finale, capSelfKey(),
       (room.contest || {}).round, ccSelfKey(), (room.shoot || {}).round, ssSelfKey(),
-      (room.review || {}).idx, prSelfKey()].join('|');   // state covers prDebate/prFinal
+      (room.review || {}).idx, prSelfKey(), (room.dilemma || {}).round, dtSelfKey()].join('|');   // state covers prDebate/prFinal + dlDilemma/dlOutcome/dlFinal
     if (key === lastKey) return;
     lastKey = key;
     function prSelfKey() {
@@ -3906,6 +4252,14 @@ const Player = (() => {
       if (room.state === 'ssWrite') return (k.lines || {})[pid] ? 1 : 0;
       return 0;
     }
+    // girl-talk self status for the dedupe key
+    function dtSelfKey() {
+      const k = room.dilemma || {};
+      if (room.state === 'dlSetup') return (k.girls || {})[pid] ? 1 : 0;
+      if (room.state === 'dlWrite') return (k.advice || {})[pid] ? 1 : 0;
+      if (room.state === 'dlVote') return (k.votes || {})[pid] != null ? 1 : 0;
+      return 0;
+    }
     const st = room.state;
     if (st === 'lobby') renderLobby();
     else if (st === 'vote') renderVote();
@@ -3933,6 +4287,12 @@ const Player = (() => {
     else if (st === 'prReview') stage().innerHTML = waitingCard('😈', 'The panel is judging…', 'Sweat. They are merciless.');
     else if (st === 'prDebate') stage().innerHTML = waitingCard('🍿', 'The panel is arguing…', 'They are fighting about YOU on the TV.');
     else if (st === 'prFinal') renderPrFinalPhone();
+    else if (st === 'dlSetup') renderDlSetup();
+    else if (st === 'dlDilemma') stage().innerHTML = waitingCard('💬', "She's spilling…", 'Eyes on the TV — she is about to need YOUR advice.');
+    else if (st === 'dlWrite') renderDlWritePhone();
+    else if (st === 'dlVote') { dtFlushDraft(); renderDlVotePhone(); }
+    else if (st === 'dlOutcome') { dtFlushDraft(); stage().innerHTML = waitingCard('🍿', 'She took the advice…', 'Watch the TV. This could get messy.'); }
+    else if (st === 'dlFinal') renderDlFinalPhone();
     else if (st === 'ssIntro') stage().innerHTML = waitingCard('😏', 'Shoot Your Shot is loading…', 'The AI is writing the profiles. Get your game face on.');
     else if (st === 'ssWrite') renderSsWrite();
     else if (st === 'ssJudge') { ssFlushDraft(); stage().innerHTML = waitingCard('💭', "She's reading every line…", 'Sweat it out.'); }
@@ -4677,6 +5037,100 @@ function renderSsWrite() {
       <div class="status-card card">
       <h3>${champ ? 'Smoothest man alive!' : 'Game over'}</h3>
       <p>You finished with <b style="color:var(--gold)">${myScore} point${myScore === 1 ? '' : 's'}</b>${champ ? ' — they never stood a chance!' : '.'}</p></div>`;
+  }
+
+
+  /* ---- Girl Talk (phone) ---- */
+  let dtDraft = '', dtBallotKey = '', dtBallot = [];
+
+  function renderDlSetup() {
+    const k = room.dilemma || {};
+    if ((k.girls || {})[pid]) { stage().innerHTML = waitingCard('💬', "She's cast!", 'Waiting for the others…'); return; }
+    let photo = null;
+    stage().innerHTML = `
+      <div class="phone-title" style="color:var(--rose)">💬 Cast our girl</div>
+      <div class="phone-sub">Pick a photo from your camera roll and give her a name — she becomes the star and will need YOUR advice all game.</div>
+      <div id="dlThumb" style="margin:12px auto;display:flex;justify-content:center"></div>
+      <button class="btn small teal" id="dlPick">📁 Pick her photo</button>
+      <input type="file" id="dlFile" accept="image/*" hidden>
+      <input type="text" class="cap-ta" id="dlName" maxlength="20" placeholder="her name…" style="min-height:0;height:auto;padding:12px;margin-top:12px;width:100%;text-align:center;font-size:20px">
+      <button class="btn big" id="dlGo" style="width:100%;margin-top:14px" disabled>Cast her ▶</button>`;
+    const check = () => { $('#dlGo').disabled = !(photo && $('#dlName').value.trim()); };
+    $('#dlPick').onclick = () => $('#dlFile').click();
+    $('#dlFile').onchange = async e2 => {
+      const f = e2.target.files && e2.target.files[0];
+      e2.target.value = '';
+      if (!f) return;
+      try {
+        const { img, url } = await fileToImage(f);
+        photo = fitDataURL(img, 1080, .82);
+        URL.revokeObjectURL(url);
+        $('#dlThumb').innerHTML = `<div class="pr-thumb" style="width:130px;height:160px"><img src="${photo}" alt=""></div>`;
+      } catch (e3) { toast('That photo did not load — try another.'); }
+      check();
+    };
+    $('#dlName').oninput = check;
+    $('#dlGo').onclick = () => {
+      const name = $('#dlName').value.trim();
+      if (!photo || !name) return;
+      $('#dlGo').disabled = true;
+      R().child('dilemma/girls/' + pid).set({ photo, name });
+    };
+  }
+
+  function renderDlWritePhone() {
+    const k = room.dilemma || {};
+    if ((k.advice || {})[pid]) { stage().innerHTML = waitingCard('💬', 'Advice sent!', 'She better be grateful…'); return; }
+    stage().innerHTML = `
+      <div class="phone-title" style="color:var(--rose)">💬 Help ${esc(k.name || 'her')}</div>
+      ${k.photo ? `<div class="cap-mini" style="width:110px;margin-bottom:6px">${mediaTag(k.photo)}</div>` : ''}
+      <div class="status-card card" style="text-align:left;width:100%"><p style="margin:0;font-size:15px">“${esc(k.situation || '')}”</p></div>
+      <div class="cap-timer" id="ssPTimer" style="font-size:30px;margin:8px 0"></div>
+      <textarea class="cap-ta" id="dlTa" maxlength="140" placeholder="your best advice… (140 chars)"></textarea>
+      <button class="btn big" id="dlGo" style="width:100%;margin-top:12px" disabled>Send advice ▶</button>`;
+    const ta = $('#dlTa'), btn = $('#dlGo');
+    dtDraft = '';
+    ssStartPhoneTimer(75000);
+    ta.oninput = () => { dtDraft = ta.value; btn.disabled = !ta.value.trim(); };
+    btn.onclick = () => { const t = ta.value.trim(); if (t) { btn.disabled = true; dtDraft = ''; R().child('dilemma/advice/' + pid).set(t); } };
+  }
+
+  // time-up safety net: whatever was typed counts
+  function dtFlushDraft() {
+    const t = dtDraft.trim(), k = room.dilemma || {};
+    if (t && room.state === 'dlWrite' && !(k.advice || {})[pid]) R().child('dilemma/advice/' + pid).set(t);
+    dtDraft = '';
+  }
+
+  function renderDlVotePhone() {
+    const k = room.dilemma || {};
+    if ((k.votes || {})[pid] != null) { stage().innerHTML = waitingCard('🗳️', 'Vote cast', 'Waiting for the rest…'); return; }
+    const bk = 'dlB:' + k.round + ':' + Object.keys(k.advice || {}).sort().join('|');
+    if (dtBallotKey !== bk) {
+      dtBallotKey = bk;
+      dtBallot = shuffle(Object.entries(k.advice || {}).filter(([apid]) => apid !== pid));   // stable shuffled ballot
+    }
+    if (!dtBallot.length) { stage().innerHTML = waitingCard('😴', 'Nothing to vote on', 'Watch the TV…'); return; }
+    stage().innerHTML = `
+      <div class="phone-title" style="color:var(--rose)">💬 Which advice does she take?</div>
+      <div class="phone-sub">Not your own — nice try.</div>
+      <div style="margin-top:8px">${dtBallot.map(([apid, t]) => `<button class="cap-pick" data-k="${esc(apid)}">${esc(t)}</button>`).join('')}</div>`;
+    stage().querySelectorAll('.cap-pick').forEach(b2 => b2.onclick = () => {
+      if (((room.dilemma || {}).votes || {})[pid] != null) return;
+      b2.classList.add('chosen');
+      R().child('dilemma/votes/' + pid).set(b2.dataset.k);
+    });
+  }
+
+  function renderDlFinalPhone() {
+    const k = room.dilemma || {};
+    const myScore = (k.scores || {})[pid] || 0;
+    const ranked = Object.entries(k.scores || {}).sort((a, b) => b[1] - a[1]);
+    const champ = ranked[0] && ranked[0][0] === pid;
+    stage().innerHTML = `<div class="big-emoji">${champ ? '👑' : '💬'}</div>
+      <div class="status-card card">
+      <h3>${champ ? 'Advice MVP!' : 'Game over'}</h3>
+      <p>You finished with <b style="color:var(--gold)">${myScore} point${myScore === 1 ? '' : 's'}</b>${champ ? ' — she owes you her entire life!' : '.'}</p></div>`;
   }
 
   /* ---- shareable recap card (canvas → PNG) ---- */
