@@ -553,11 +553,15 @@ exports.fytDeck = onCall({ region: 'us-central1', timeoutSeconds: 540 }, async (
       `Fully clothed, realistic, shot on a phone, no text, no watermark. No two women alike.`,
       3200);
     const prompts = firstJson(text, '[', ']').slice(0, 40);
-    const photos = [];
-    for (let i = 0; i < prompts.length; i += 5) {   // parallel batches — gentle on rate limits
-      const batch = await Promise.all(prompts.slice(i, i + 5).map(pr =>
-        xaiImage(pr).catch(e => { console.error('fyt image failed:', e.message); return null; })));
-      photos.push(...batch);
+    const photos = new Array(prompts.length).fill(null);
+    // up to 4 passes — retry ONLY the slots that failed, so the deck is all-AI
+    for (let pass = 0; pass < 4 && photos.some(x => !x); pass++) {
+      const missing = prompts.map((pr, i) => [pr, i]).filter(([, i]) => !photos[i]);
+      for (let i = 0; i < missing.length; i += 5) {   // parallel batches — gentle on rate limits
+        await Promise.all(missing.slice(i, i + 5).map(async ([pr, idx]) => {
+          photos[idx] = await xaiImage(pr).catch(e => { console.error(`fyt image ${idx} pass ${pass + 1} failed:`, e.message); return null; });
+        }));
+      }
     }
     const ok = photos.filter(Boolean);
     console.log(`fytDeck: ${ok.length}/${prompts.length} photos generated`);

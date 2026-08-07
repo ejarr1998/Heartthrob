@@ -2013,19 +2013,17 @@ const TV = (() => {
   }
   async function doFytGen() {
     const res = await aiCall('fytDeck', {}, 480000);
-    let urls = ((res && res.photos) || []).filter(Boolean).sort(() => Math.random() - .5);
-    if (urls.length < 40) {   // top up from the photo library — AI first
-      try {
-        const libS = await db.ref('library').once('value');
-        const libUrls = Object.values(libS.val() || {}).map(x => x.url).filter(u => u && !urls.includes(u)).sort(() => Math.random() - .5);
-        urls = urls.concat(libUrls);
-      } catch (e) { /* no library reachable */ }
-    }
-    if (urls.length < 40) {
-      toast(`AI only made ${((res && res.photos) || []).length} photos and the library can't fill the gap`, 6000);
+    const made = ((res && res.photos) || []).filter(Boolean).sort(() => Math.random() - .5);
+    if (!made.length) {
+      toast('AI deck generation failed completely — try again', 6000);
       R().update({ state: 'lobby' });
       return;
     }
+    // guarantee: ONLY AI photos. If a few slots failed after all retries, repeat
+    // AI photos (never the library) to fill the 40 — dupes land rounds apart
+    const urls = [];
+    for (let i = 0; i < 40; i++) urls.push(made[i % made.length]);
+    if (made.length < 40) toast(`AI made ${made.length}/40 — a few photos will repeat`, 4000);
     const roundsArr = [];
     for (let r = 0; r < 10; r++) roundsArr.push(urls.slice(r * 4, r * 4 + 4));
     await R().update({ rounds: roundsArr, round: 0, votes: null, top10: null, state: 'vote', mode: 'classic', aiDeck: true });
