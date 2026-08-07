@@ -2019,11 +2019,21 @@ const TV = (() => {
       R().update({ state: 'lobby' });
       return;
     }
-    // guarantee: ONLY AI photos. If a few slots failed after all retries, repeat
-    // AI photos (never the library) to fill the 40 — dupes land rounds apart
-    const urls = [];
-    for (let i = 0; i < 40; i++) urls.push(made[i % made.length]);
-    if (made.length < 40) toast(`AI made ${made.length}/40 — a few photos will repeat`, 4000);
+    // AI first (with server-side retries); stock library photos backfill any gaps
+    const urls = made.slice();
+    if (urls.length < 40) {
+      try {
+        const libS = await db.ref('library').once('value');
+        const libUrls = Object.values(libS.val() || {}).map(x => x.url).filter(u => u && !urls.includes(u)).sort(() => Math.random() - .5);
+        urls.push(...libUrls.slice(0, 40 - urls.length));
+      } catch (e) { /* no library reachable */ }
+    }
+    if (urls.length < 40) {
+      toast(`AI made ${made.length} and the library can't fill the gap (${urls.length}/40)`, 6000);
+      R().update({ state: 'lobby' });
+      return;
+    }
+    if (made.length < 40) toast(`AI made ${made.length}/40 — stock photos filled the rest`, 4000);
     const roundsArr = [];
     for (let r = 0; r < 10; r++) roundsArr.push(urls.slice(r * 4, r * 4 + 4));
     await R().update({ rounds: roundsArr, round: 0, votes: null, top10: null, state: 'vote', mode: 'classic', aiDeck: true });
