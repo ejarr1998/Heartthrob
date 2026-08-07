@@ -1822,6 +1822,7 @@ const TV = (() => {
     if (wantHB && !hbTimer) hbTimer = setInterval(() => SFX.play('heart'), 1150);
     if (!wantHB && hbTimer) { clearInterval(hbTimer); hbTimer = null; }
     if (st === 'lobby') { VOICE.resetSession(); renderLobby(); }   // fresh anti-repeat history each game
+    else if (st === 'fytGen') renderFytGenTV();
     else if (st === 'vote') renderVote();
     else if (st === 'reveal') { if (once('reveal:' + room.round)) playReveal(); }
     else if (st === 'turnIntro') renderIntro();
@@ -1865,6 +1866,7 @@ const TV = (() => {
 
   /* ---------- lobby ---------- */
   let prevPlayerCount = 0;
+  let fytAi = false;   // lobby toggle: generate the whole 40-photo deck with Grok
   function renderLobby() {
     const ps = players();
     const sauced = ps.some(([pid, p]) => ((p.name || '').trim().toLowerCase()) === 'sauce time');   // 🔞 hidden mode key
@@ -1885,6 +1887,9 @@ const TV = (() => {
       <div class="tv-caption" style="margin:14px 0 0">Who's playing<span class="accent">?</span></div>
       <div class="lobby-grid" id="lobbyGrid"></div>
       <div class="mode-row">
+        <div style="width:100%;text-align:center;margin-bottom:6px">
+          <button class="btn ghost" id="fytAiTog" style="font-size:14px;padding:8px 16px;${fytAi ? 'border-color:var(--gold);color:var(--gold)' : 'opacity:.7'}">${fytAi ? '🤖 Full AI deck: ON — 40 fresh women generated' : '🤖 Full AI deck: off'}</button>
+        </div>
         <button class="btn big gold" id="startBtn" ${ps.length < 2 ? 'disabled' : ''}>💘 Find Your Type ▶</button>
         <button class="btn big teal" id="sdBtn" ${ps.length < 3 ? 'disabled' : ''}>⚔️ Showdown ▶</button>
         <button class="btn big" id="capBtn" ${ps.length < 2 ? 'disabled' : ''}>😂 She's a 10 but… ▶</button>
@@ -1910,7 +1915,13 @@ const TV = (() => {
     });
     const btn = s.querySelector('#startBtn');
     if (ps.length > 6) btn.disabled = true;
-    btn.onclick = () => { playStartFx(Math.random() < .5 ? 'vo_start_1' : 'vo_start_2'); R().update({ state: 'vote', mode: 'classic' }); };
+    btn.onclick = () => {
+      if (fytAi) { btn.disabled = true; startClassicAI(); return; }
+      playStartFx(Math.random() < .5 ? 'vo_start_1' : 'vo_start_2');
+      R().update({ state: 'vote', mode: 'classic' });
+    };
+    const tog = s.querySelector('#fytAiTog');
+    if (tog) tog.onclick = () => { fytAi = !fytAi; SFX.play('pop'); renderLobby(); };
     const sdb = s.querySelector('#sdBtn');
     if (ps.length > 6) sdb.disabled = true;
     sdb.onclick = () => startShowdown();
@@ -1988,6 +1999,36 @@ const TV = (() => {
       updates['state'] = 'reveal';
       R().update(updates);
     }
+  }
+
+  /* ---------- full-AI deck generation for Find Your Type ---------- */
+  async function startClassicAI() {
+    playStartFx(Math.random() < .5 ? 'vo_start_1' : 'vo_start_2');
+    await R().update({ state: 'fytGen', mode: 'classic' });
+  }
+  function renderFytGenTV() {
+    stage().innerHTML = `<div class="tv-caption">🤖 Building tonight's deck<span class="accent">…</span></div>
+      <div class="tv-sub">Grok is painting 40 women for the 10 rounds — give it a minute or two. Phones down, drinks up.</div>`;
+    if (once('fytGen')) doFytGen();
+  }
+  async function doFytGen() {
+    const res = await aiCall('fytDeck', {}, 480000);
+    let urls = ((res && res.photos) || []).filter(Boolean).sort(() => Math.random() - .5);
+    if (urls.length < 40) {   // top up from the photo library — AI first
+      try {
+        const libS = await db.ref('library').once('value');
+        const libUrls = Object.values(libS.val() || {}).map(x => x.url).filter(u => u && !urls.includes(u)).sort(() => Math.random() - .5);
+        urls = urls.concat(libUrls);
+      } catch (e) { /* no library reachable */ }
+    }
+    if (urls.length < 40) {
+      toast(`AI only made ${((res && res.photos) || []).length} photos and the library can't fill the gap`, 6000);
+      R().update({ state: 'lobby' });
+      return;
+    }
+    const roundsArr = [];
+    for (let r = 0; r < 10; r++) roundsArr.push(urls.slice(r * 4, r * 4 + 4));
+    await R().update({ rounds: roundsArr, round: 0, votes: null, top10: null, state: 'vote', mode: 'classic', aiDeck: true });
   }
 
   /* ---------- staggered reveal (the signature stamp) ---------- */
@@ -3238,7 +3279,7 @@ const TV = (() => {
   // one wrapper for every AI call — null means "backend not ready", callers fall back to the mock
   async function aiCall(name, payload, timeoutMs) {
     try {
-      const fn = firebase.functions().httpsCallable(name);
+      const fn = firebase.functions().httpsCallable(name, { timeout: Math.min(540000, (timeoutMs || 20000) + 20000) });
       const out = await Promise.race([
         fn(payload),
         new Promise((_, rej) => setTimeout(() => rej(new Error('ai timeout')), timeoutMs || 20000))
@@ -4412,6 +4453,7 @@ const Player = (() => {
     }
     const st = room.state;
     if (st === 'lobby') renderLobby();
+    else if (st === 'fytGen') stage().innerHTML = waitingCard('🤖', 'The AI is building the deck…', '40 fresh photos incoming. Watch the TV.');
     else if (st === 'vote') renderVote();
     else if (st === 'reveal') renderWatchTV();
     else if (st === 'turnIntro') renderIntro();

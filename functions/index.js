@@ -539,3 +539,31 @@ exports.rpTurn = onCall({ region: 'us-central1', timeoutSeconds: 180 }, async (r
     return { demo: true };
   }
 });
+
+/* ---- Find Your Type: a full 10-round deck (40 photos) painted by Grok ----
+   One text call designs 40 distinct women, then images generate in parallel
+   batches of 5. Client tops up from the photo library if any fail. */
+exports.fytDeck = onCall({ region: 'us-central1', timeoutSeconds: 540 }, async (req) => {
+  if (!XAI_KEY()) return { demo: true };
+  try {
+    const text = await chat(
+      'You write image-generation prompts for photorealistic dating-app style photos of women for a party voting game. Return ONLY JSON — no markdown.',
+      `Write 40 DISTINCT image prompts as a JSON array of 40 strings. Each string: "Casual candid photo of a [age 21-34]-year-old woman, [ethnicity and look], [hair], wearing [everyday outfit], [setting], [natural lighting and relaxed pose]". ` +
+      `Vary EVERYTHING widely across the set — ethnicities, hairstyles, builds, outfits, settings (coffee shop, beach, gym, bookstore, rooftop bar, hiking trail, farmers market, art gallery, office, kitchen, concert, dog park…), moods (laughing, smirking, shy, confident). ` +
+      `Fully clothed, realistic, shot on a phone, no text, no watermark. No two women alike.`,
+      3200);
+    const prompts = firstJson(text, '[', ']').slice(0, 40);
+    const photos = [];
+    for (let i = 0; i < prompts.length; i += 5) {   // parallel batches — gentle on rate limits
+      const batch = await Promise.all(prompts.slice(i, i + 5).map(pr =>
+        xaiImage(pr).catch(e => { console.error('fyt image failed:', e.message); return null; })));
+      photos.push(...batch);
+    }
+    const ok = photos.filter(Boolean);
+    console.log(`fytDeck: ${ok.length}/${prompts.length} photos generated`);
+    return { photos: ok };
+  } catch (e) {
+    console.error('fytDeck failed', e);
+    return { demo: true };
+  }
+});
